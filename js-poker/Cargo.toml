@@ -1,0 +1,13 @@
+[package]
+name = "js-poker"
+version = "0.1.0"
+authors = ["soederpop <jon@dais.com>"]
+edition = "2018"
+
+[lib]
+name = "libpoker"
+path = "src/lib.rs"
+
+[[bin]]
+name = "poker"
+path = "src/bin.rs"

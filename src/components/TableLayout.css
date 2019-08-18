@@ -1,0 +1,88 @@
+.seat .player-cards-container {
+}
+
+.seats-9 .seat {
+  display: flex;
+  flex-direction: row;
+}
+
+.seats-9 .seat-5,
+.seats-9 .seat-6 {
+  flex-direction: row-reverse;
+}
+
+.seats-9 .seat .avatar-container {
+  z-index: 5000;
+}
+
+.seats-9 .seat-5 .avatar-container,
+.seats-9 .seat-6 .avatar-container {
+  margin-left: -30px;
+}
+
+.seats-9 .seat .player-info-container {
+  margin-left: -30px;
+  height: 60px;
+  width: 140px;
+  margin-top: 28px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 1);
+  border-radius: 12px;
+  padding-left: 40px;
+  text-align: left;
+}
+
+.seats-9 .seat-5 .player-info-container,
+.seats-9 .seat-6 .player-info-container {
+  margin-left: 0px;
+  padding-right: 40px;
+  text-align: right;
+}
+
+.seats-9 .seat-1 {
+  top: 250px;
+  left: 20px;
+}
+
+.seats-9 .seat-9 {
+  left: 100px;
+  bottom: 250px;
+}
+
+.seats-9 .seat-2 {
+  top: 70px;
+  left: 200px;
+}
+
+.seats-9 .seat-3 {
+  top: 60px;
+  left: 510px;
+}
+
+.seats-9 .seat-4 {
+  top: 70px;
+  left: 840px;
+}
+
+.seats-9 .seat-5 {
+  top: 250px;
+  right: 20px;
+}
+
+.seats-9 .seat-6 {
+  bottom: 250px;
+  right: 100px;
+}
+
+.seats-9 .seat-7 {
+  bottom: 100px;
+  left: 700px;
+}
+
+.seats-9 .seat-8 {
+  bottom: 100px;
+  left: 300px;
+}
+
+.seats-9 .seat-9 {
+}

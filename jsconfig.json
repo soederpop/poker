@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "target": "ES6"
+  },
+  "include": ["src/**/*.js", "server/**/*.js", "scripts/**/*.js"],
+  "exclude": ["**/node_modules/**", "**/lib/**"]
+}

@@ -1,0 +1,53 @@
+{
+  "name": "pokurr",
+  "version": "1.0.0",
+  "description": "a tool for poker simulation and analysis",
+  "main": "index.js",
+  "scripts": {
+    "console": "NODE_ENV=development skypager console",
+    "start": "skypager serve",
+    "start:dev": "NODE_ENV=development skypager serve",
+    "build": "yarn build:client && yarn build:lib",
+    "build:client": "BUILD_ENV=build babel -d lib src/client.js",
+    "build:lib": "BUILD_ENV=build babel -d lib server",
+    "play": "BUILD_ENV=build skypager play --dev --babel",
+    "build:webapp": "BUILD_ENV=build-web skypager build",
+    "dev": "NODE_ENV=development skypager serve --hot --open",
+    "test": "skypager test --mocha"
+  },
+  "bin": {
+    "pokurr": "./pokurr.js"
+  },
+  "keywords": [
+    "poker",
+    "texas holdem",
+    "range equity calculator"
+  ],
+  "author": "Jon Soeder <jon@chicago.com>",
+  "license": "MIT",
+  "skypager": {
+    "webpacks": {
+      "build": "webpack.config.js",
+      "start": "webpack.config.js"
+    }
+  },
+  "dependencies": {
+    "poker-tools": "^1.3.10",
+    "tx-holdem": "^1.0.0",
+    "worker-farm": "^1.7.0",
+    "@skypager/features-file-db": "^1.1.1",
+    "js-combinatorics": "^0.5.4"
+  },
+  "devDependencies": {
+    "@skypager/webpack": "^1.1.5",
+    "@skypager/devtools": "^1.3.0",
+    "skypager": "^40.1.16"
+  },
+  "contributors": [],
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ]
+}

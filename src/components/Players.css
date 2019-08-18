@@ -1,0 +1,8 @@
+.seat .player-stats {
+  text-align: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  margin-bottom: -32px;
+  width: 96px;
+  position: absolute;
+  bottom: 0;
+}

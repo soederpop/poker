@@ -1,0 +1,9 @@
+lib/
+data/
+db/
+secrets/
+node_modules/
+*.log
+*.sock
+.tmp
+.DS_Store
