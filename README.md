@@ -259,8 +259,7 @@ The Web Application gives a web based poker table which can be used to observe t
 where you can see everyone's cards.
 
 ```shell
-$ yarn serve
-$ yarn dev:webapp
+$ yarn dev
 ```
 
 It includes a number of UI tools for analyzing hand ranges and combinations, calculating equity, exploring flop textures, etc.
