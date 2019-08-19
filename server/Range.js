@@ -1081,7 +1081,6 @@ export default class Range {
     const modifier = modifiers.join("");
     const rankValues = [ALIASES[rankOne], ALIASES[rankTwo]]
       .sort()
-      .reverse();
 
     return { rankOne, rankTwo, rankValues, modifier }
   }
@@ -1261,6 +1260,9 @@ const filterCombo = (combo, filters) => {
   const { item, ranged, top, bottom, pair, suited, greater, weaker, rank, kicker, connected, oneGap, twoGap, threeGap } = filters      
   // a pair is always greater than a non-pair range
 
+  if (combo.normalized === 'KQs') {
+    debugger
+  }
   if (ranged) {
     return filterCombo(combo, {
       ...top,
@@ -1310,15 +1312,15 @@ const filterCombo = (combo, filters) => {
   }
 
   if (!pair && greater) {
-    if (combo.rank !== rank) {
-      match = false;
-    } else if (combo.rank === kicker && combo.kicker < rank) {
+    if (combo.rank === kicker && combo.kicker < rank) {
       match = false 
     } else if (combo.kicker < kicker) {
       match = false;
+    } else if (combo.rank !== rank && combo.kicker !== rank) {
+      match = false
     }
   } else if (!pair && weaker) {
-    if (combo.rank !== rank) {
+    if (combo.rank !== rank && combo.kicker !== rank) {
       match = false;
     } else if (combo.rank === rank && combo.kicker > kicker) {
       match = false;

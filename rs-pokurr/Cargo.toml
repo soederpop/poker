@@ -1,13 +1,13 @@
 [package]
-name = "js-poker"
+name = "pokurr"
 version = "0.1.0"
 authors = ["soederpop <jon@dais.com>"]
 edition = "2018"
 
 [lib]
-name = "libpoker"
+name = "libpokurr"
 path = "src/lib.rs"
 
 [[bin]]
-name = "poker"
+name = "pokurr"
 path = "src/bin.rs"

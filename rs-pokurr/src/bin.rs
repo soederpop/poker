@@ -1,4 +1,4 @@
-use libpoker::test;
+use libpokurr::test;
 
 pub fn main() {
     test();

@@ -4,8 +4,8 @@ const { Range } = runtime
 const individual = [
   ["22-99", 48],
   ["ATs-AKs", 16],
-  ["KTs+", 12],
-  ["QTs+", 12],
+  ["KTs+", 16],
+  ["QTs+", 16],
   ["JTs", 4],
   ["T9s", 4],
   ["98s", 4],
@@ -22,7 +22,8 @@ describe('Hand Range', function() {
       combos.should.include('KTs')
       combos.should.include('KJs')
       combos.should.include('KQs')
-      combos.length.should.equal(3)
+      combos.should.include('AKs')
+      combos.length.should.equal(4)
 
     })
 
@@ -54,6 +55,10 @@ describe('Hand Range', function() {
 
       combined.normalizedComboNames.should.include('AKs','AQs', 'AJs', 'ATs', 'KQs', 'KJs', 'KTs', 'QJs', 'QTs', 'TJs', '99', '88', '77', '66', '55', '44', '33', '22', '87s', '98s', 'T9s')
       combined.size.should.equal(totalSum)
+      combined.size.should.equal(112)
+
+      console.log(combined.input)
+      console.log(combined.normalizedComboNames)
     })
   })
 })

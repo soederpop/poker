@@ -18,16 +18,26 @@ const CLUBS: i32 = 22;
 const SPADES: i32 = 23;
 
 const SUITS: [i32; 4] = [HEARTS, DIAMONDS, CLUBS, SPADES];
-const RANKS: [i32; 13] = [TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE];
+const RANKS: [i32; 13] = [
+  TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE,
+];
 
 pub struct Card {
   suit: i32,
   rank: i32,
 }
 
+impl Card {
+  // This should display the human friendly name of the card, which internally we need to work with as the numbers defined in the constants above
+  fn name(&self) -> str {
+    let name = String::from("Ah");
+    name;
+  }
+}
+
 // a deck is 4 suits x 13 ranks for a total of 52 cards
 pub struct Deck {
-  cards: [Card, 52]
+  cards: [Card; 52],
 }
 
 // Hand Rankings describe a 5 card combination of cards
@@ -41,16 +51,19 @@ const FULL_HOUSE: i32 = 7; // 3 Cards of the Same rank, plus 2 cards of another 
 const STRAIGHT_FLUSH: i32 = 8; // 5 cards in order of rank, 5 cards of the same suit
 const ROYAL_FLUSH: i32 = 9; // Ten thru Ace of the same suit
 
-const HAND_RANKS: [i32; 9] = [HIGH_CARD, PAIR, TWO_PAIR, THREE_OF_A_KIND, STRAIGHT, FLUSH, FULL_HOUSE, STRAIGHT_FLUSH, ROYAL_FLUSH];
-
-
-impl Card {
-  fn new(suitLabel: str, rankLabel: str) -> Card {
-
-  }
-}
+const HAND_RANKS: [i32; 9] = [
+  HIGH_CARD,
+  PAIR,
+  TWO_PAIR,
+  THREE_OF_A_KIND,
+  STRAIGHT,
+  FLUSH,
+  FULL_HOUSE,
+  STRAIGHT_FLUSH,
+  ROYAL_FLUSH,
+];
 
 pub fn test() {
-  // list out the combos
-  println!("Hello")
+  let card = Card { rank: 12, suit: 20 };
+  println!("{}", card.name());
 }

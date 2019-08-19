@@ -14,4 +14,20 @@ const framework = loadSource
   ? require('./server')
   : require('./lib')
 
-module.exports = runtime.use(framework)
+/** 
+ * @param {String} gameType
+ * @param {Object} options 
+ * @param {Number|Object} players 
+ * @param {Number} startingStack
+ * @param {Array<Number>} blinds
+ * @param {Object<String,Array<Card>} cards
+*/
+function gameFactory(gameType, options = {}) {
+  return runtime.game(gameType, options)
+}
+
+const gameRuntime = runtime.use(framework)
+
+gameRuntime.createGame = gameFactory
+
+module.exports = gameRuntime
