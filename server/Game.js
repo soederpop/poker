@@ -87,7 +87,7 @@ export class Game extends Helper {
       return this.actionOrder.find(seat => this.seat(seat).inHand)
     }
 
-    const nextSeat = this.remainingActionOrder.find(seat => this.seat(seat) && this.seat(seat).inHand)
+    const nextSeat = this.remainingActionOrder.find(seat => this.seat(seat) && this.seat(seat).inHand && !this.seat(seat).allIn)
 
     if (nextSeat) return nextSeat
 
@@ -241,17 +241,19 @@ export class Game extends Helper {
 
     this.runtime.debug(`Recording Action`, { playerId, action, amount })
 
-    actions = actions.concat([{ 
-      stage, 
-      seat: player.seat, 
-      ...stage === 'preflop' && this.isPotOpen && { open: true },
-      timestamp: Math.floor(+new Date()) / 1000, 
-      playerId, 
-      action, 
+    const actionRecord = {
+      stage,
+      seat: player.seat,
+      ...(stage === "preflop" && this.isPotOpen && { open: true }),
+      timestamp: Math.floor(+new Date()) / 1000,
+      playerId,
+      action,
       amount,
       previousHash: this.hash,
       order: actions.length
-    }])
+    };
+
+    actions = actions.concat([actionRecord])
 
     switch(action) {
       case 'post':
@@ -259,8 +261,16 @@ export class Game extends Helper {
       case 'raise':
       case 'call':
         this.state.set('pot', this.pot + amount)
+        const nextStackSize = max([player.chips - amount, 0])
+        const allIn = nextStackSize <= 0 
+
+        if (allIn) {
+          actionRecord.allIn = true
+        }
+
         this.updatePlayer(playerId, {
-          chips: max([player.chips - amount, 0])
+          chips: nextStackSize,
+          allIn
         })
         break
       case 'check':
@@ -270,17 +280,29 @@ export class Game extends Helper {
           inHand: false
         })
         break
+      case 'result':
+        break
     }
 
     if (action === 'bet' || action === 'raise') {
       this.state.set('lastBetSeat', player.seat)
     }
 
-    this.state.set('actions', actions)
+    // these are the only actions that can close off the action
+    if (action === 'check' || action === 'call' || action === 'fold') {
+      this.runtime.debug('Checking if we can close the betting round', {
+        action,
+        finalActionSeat: this.finalActionSeat,
+        previousActionSeat: this.previousActionSeat,
+        actionIsClosed: this.actionIsClosed
+      })
 
-    if (this.finalActionSeat === this.previousActionSeat || this.isActionClosed) {
-      this.finalizeRound()      
+      if (this.isActionClosed && this.potIsGood) {
+        this.finalizeRound()      
+      }
     }
+
+    this.state.set('actions', actions)
 
     return this
   }
@@ -306,9 +328,11 @@ export class Game extends Helper {
         this.reset()
         this.state.set('dealer', this.dealerSeat === 9 ? 1 : this.dealerSeat + 1)
       })
-    } else if (this.isActionClosed && this.stage !== 'river') {
+    } else if (this.stage !== 'river' && (this.playersLeftToAct === 0 || this.actionIsClosed)) {
       this.runtime.debug(`Action is closed, stage is not river. Auto-dealing.`, {
-        stage: this.stage
+        stage: this.stage,
+        playersLeftToAct: this.playersLeftToAct,
+        actionIsClosed: this.actionIsClosed
       })
       this.deal()
     }
@@ -316,6 +340,10 @@ export class Game extends Helper {
     return this
   }
 
+  get playersLeftToAct() {
+    return this.remainingPlayers.filter(({ allIn }) => !allIn).length
+  }
+  
   awardPotToWinners() {
     const { remainingPlayers = [], pot } = this
 
@@ -377,12 +405,14 @@ export class Game extends Helper {
       return false
     }
 
-    if (this.finalActionSeat === this.previousActionSeat) {
-      return true
-    }
-
-    if (this.actionSeat === this.lastBetSeat) {
-      return true
+    if (this.isPotRaised && this.isPotGood) {
+      if (this.finalActionSeat === this.previousActionSeat) {
+        return true
+      }
+  
+      if (this.actionSeat === this.lastBetSeat) {
+        return true
+      }
     }
 
     if (this.stage === 'flop' || this.stage === 'turn' || this.stage === 'river') {
@@ -455,6 +485,10 @@ export class Game extends Helper {
     return this.remainingActionOrder.map(seat => this.seat(seat)).filter(p => folded.indexOf(p.playerId) === -1)
   }
 
+  get isPotGood() {
+    return !this.allActors.find(actor => actor.toGo > 0)
+  } 
+
   get eligiblePlayers() {
     return this
       .chain
@@ -502,6 +536,7 @@ export class Game extends Helper {
 
     this.updateAllPlayers(({ chips }) => ({
       startingChips: chips,
+      allIn: false,
       cards: []
     }))
 

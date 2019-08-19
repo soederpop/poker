@@ -29,9 +29,11 @@ See [Applications](#Applications) for more info about the available applications
 ### Development Scripts
 
 - `npm run dev` will start a development server, for both the backend API and frontend React application, which will open in your browser.
+- `npm run dev:console` will do the same, but drop you into a REPL so you can work with the game instances from the server
 - `npm run build` will build the library and server code for distribution, and running in production
 - `npm run play` will start the terminal based view of the game simulation. Follow the instructions on the screen for interacting with the game.
 - `npm run console` will open up a REPL
+- `npm run test` will run the test suite
 
 ## Project Structure
 

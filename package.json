@@ -13,6 +13,7 @@
     "play": "BUILD_ENV=build skypager play --dev --babel",
     "build:webapp": "BUILD_ENV=build-web skypager build",
     "dev": "NODE_ENV=development skypager serve --hot --open",
+    "dev:console": "yarn dev --silent --disable-logging --interactive",
     "test": "skypager test --mocha"
   },
   "bin": {
@@ -32,15 +33,19 @@
     }
   },
   "dependencies": {
+    "@skypager/features-file-db": "^1.1.1",
+    "js-combinatorics": "^0.5.4",
     "poker-tools": "^1.3.10",
     "tx-holdem": "^1.0.0",
-    "worker-farm": "^1.7.0",
-    "@skypager/features-file-db": "^1.1.1",
-    "js-combinatorics": "^0.5.4"
+    "worker-farm": "^1.7.0"
   },
   "devDependencies": {
-    "@skypager/webpack": "^1.1.5",
     "@skypager/devtools": "^1.3.0",
+    "@skypager/webpack": "^1.1.5",
+    "chai": "^4.2.0",
+    "chai-sinon": "^2.8.1",
+    "mocha": "^6.2.0",
+    "sinon": "^7.4.1",
     "skypager": "^40.1.16"
   },
   "contributors": [],

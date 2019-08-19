@@ -143,6 +143,10 @@ export class Actor extends Helper {
         .value()
   }
 
+  get allIn() {
+    return !!this.playerData.allIn
+  }
+  
   get inHand() {
     return !!this.playerData.inHand
   }
