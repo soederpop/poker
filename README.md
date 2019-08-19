@@ -266,6 +266,8 @@ It includes a number of UI tools for analyzing hand ranges and combinations, cal
 
 ### Terminal CLI Application
 
+![Screenshot](docs/screenshot2.png)
+
 The same view of the game server, but using ANSI art in the terminal. Powered by ink and React
 
 ```shell

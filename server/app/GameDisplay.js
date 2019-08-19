@@ -51,14 +51,17 @@ export function App(props = {}) {
   })
 
   return (
-    <Box width={140} flexDirection="row">
-      <Box width={80}>
+    <Box width={170} flexDirection="row">
+      <Box width={90} flexDirection="column">
         <HoldemGame {...props} hash={game.hash} />
+        <Box>Keys: (A) act (D) deal (E) Equity</Box>
       </Box>
       <Box width={80} flexDirection="column">
         <GameInfo game={game} width={20} />
         ---
-        <Color bold underline>Log:</Color>
+        <Color bold underline>
+          Log:
+        </Color>
         {infoLines}
       </Box>
     </Box>
