@@ -2,6 +2,8 @@
 
 Run a game of Texas Holdem poker, played by computer actors who can have their strategies programmed.
 
+![Screenshot](docs/screenshot.png)
+
 A strategy is used to decide between a range of possible actions in a single poker hand. At each decision point,
 a strategy can incorporate any amount of information it can extract from the environment, to decide which action to take.
 
