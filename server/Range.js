@@ -1074,6 +1074,18 @@ export default class Range {
     return results
   }
   
+
+  static enforceRankOrder(str) {
+    const parts = str.split("");
+    const [rankOne, rankTwo, ...modifiers] = parts;
+    const modifier = modifiers.join("");
+    const rankValues = [ALIASES[rankOne], ALIASES[rankTwo]]
+      .sort()
+      .reverse();
+
+    return { rankOne, rankTwo, rankValues, modifier }
+  }
+
   /** 
    * Given a single range value (e.g one in a comma separated list AKo,AJs+)
    * turn it into a CombinationFilter which can be used to match the combination.
@@ -1082,15 +1094,8 @@ export default class Range {
    * @returns {ComboFilter}
   */
   static expandHand(str) {
-    const parts = str.split("");
-    const [rankOne, rankTwo, ...modifiers] = parts;
-    const modifier = modifiers.join("");
-    const rankValues = [ALIASES[rankOne], ALIASES[rankTwo]].sort().reverse();
+    const { rankOne, rankTwo, rankValues, modifier } = this.enforceRankOrder(str)
 
-    if (rankValues[0] < rankValues[1]) {
-      return this.expandHand([rankTwo, rankOne, ...modifiers].join(""))
-    }
-  
     return {
       item: str,
       pair: rankOne === rankTwo,

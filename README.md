@@ -2,7 +2,7 @@
 
 Run a game of Texas Holdem poker, played by computer actors who can have their strategies programmed.
 
-![Screenshot](docs/screenshot.png)
+![Screenshot](docs/webapp-screenshot.png)
 
 A strategy is used to decide between a range of possible actions in a single poker hand. At each decision point,
 a strategy can incorporate any amount of information it can extract from the environment, to decide which action to take.
@@ -266,7 +266,7 @@ It includes a number of UI tools for analyzing hand ranges and combinations, cal
 
 ### Terminal CLI Application
 
-![Screenshot](docs/screenshot2.png)
+![CLI Game Screenshot](docs/cli-game-screenshot.png)
 
 The same view of the game server, but using ANSI art in the terminal. Powered by ink and React
 
@@ -277,6 +277,8 @@ $ yarn play
 ### REPL
 
 The REPL gives you access to all of the classes, game, in a JavaScript console you can use to explore the different ranges, combinations, and utilities
+
+![Console Screenshot](docs/console-screenshot.png)
 
 ```shell
 $ yarn console
