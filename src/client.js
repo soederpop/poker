@@ -144,6 +144,9 @@ const client = {
    * @name searchFlops
    * @function
    * @param {FlopsFilters} filters
+   * @param {Number} [filters.sample] get a random sample of size n 
+   * @param {Number} [filters.page=1] which page
+   * @param {Number} [filters.limit=500] how many results per page?
    */
   searchFlops(filters = {}) {
     return this.client({ url: `${baseURL}/ranges/flops`, params: filters })

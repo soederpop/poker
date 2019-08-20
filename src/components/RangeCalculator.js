@@ -4,10 +4,16 @@ import { Segment, Header, Form } from 'semantic-ui-react'
 
 export class RangeCalculator extends Component {
   render() {
+    return <RangeBrowser />
+  }
+}
+
+export class RangeBrowser extends Component {
+  render() {
     return (
-      <Segment basic>
-        <Header as="h2" content="Compare Range Equity" />  
-        <Form>
+      <Segment inverted>
+        <Header inverted as="h2" content="Compare Range Equity" />  
+        <Form inverted>
           <Form.Input label="Range One" />  
           <Form.Input label="Range Two" />  
           <Form.Input label="Number of players" />  

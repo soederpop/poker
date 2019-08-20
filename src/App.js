@@ -68,13 +68,22 @@ export class App extends Component {
 
   componentDidMount() {
     const { runtime } = this.props
-    const { keybindings } = runtime
+    const { voiceCommander, keybindings } = runtime
 
-    this.disposer = runtime.state.observe(({ name, newValue }) => {
+    const d1 = runtime.state.observe(({ name, newValue }) => {
       if (name === 'activeTool') {
         this.setState({ activeTool: newValue })
       }
     })
+
+    const d2 = voiceCommander.commands.observe(({ newValue: commandState }) => {
+      console.log('got command state', commandState)
+    })
+
+    this.disposer = () => {
+      d1()
+      d2()
+    }
 
     keybindings.bind('g f', this.toggleFlopBrowser)
     keybindings.bind('g r', this.toggleRangeCalculator)
