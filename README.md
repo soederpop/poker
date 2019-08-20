@@ -286,6 +286,12 @@ The REPL gives you access to all of the classes, game, in a JavaScript console y
 $ yarn console
 ```
 
+### Rust Project
+
+I'm new to rust, but attempting to write the flop, turn, river enumerator and equity calculator functionality as a rust module for speed.
+
+[rs-pokurr](rs-pokurr)
+
 ## Additional Reading
 
 - [Upswing Poker Article #1](https://upswingpoker.com/gto-poker-game-theory-optimal-strategy/)

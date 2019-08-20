@@ -11,3 +11,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "pokurr"
 path = "src/bin.rs"
+
+[dependencies]
+rand = "0.3.12"
