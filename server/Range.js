@@ -812,7 +812,7 @@ export default class Range {
             Object.assign(combo, {
               toJSON() {
                 return Object.getOwnPropertyNames(combo)
-                  .filter(key => key !== 'textureHash', key !== 'toJSON' && key !== 'has' && key !== 'cardGroup')
+                  .filter(key => key !== 'textureHash' && key !== 'toJSON' && key !== 'has' && key !== 'cardGroup')
                   .reduce((memo,name) => ({
                     ...memo,
                     [name]: this[name]

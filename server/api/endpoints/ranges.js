@@ -19,12 +19,19 @@ export default async function setupRangesEndpoint(app) {
       .pick( flops.first().keys().value() )
       .value()
     
-    const { page = 1, limit = 500 } = req.params
+    const { sample, page = 1, limit = 500 } = req.params
     const startAt = (page - 1) * limit
     const endAt = startAt + limit
-    const results = flops.filter(filters).slice(startAt, endAt).value()
 
-    res.json({ page, limit, startAt, endAt, filters, flops: results })
+    let results = flops.filter(filters)
+
+    if (sample) {
+      results = results.shuffle().slice(0, sample)  
+    } else {
+      results = results.slice(startAt, endAt)
+    }
+
+    res.json({ page, limit, startAt, endAt, filters, flops: results.value() })
   })
  
   app.get('/ranges/combos', (req, res) => {
