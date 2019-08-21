@@ -1,8 +1,17 @@
 import { Server } from "@skypager/helpers-server";
 import bodyParser from "body-parser";
+import feathers from '@feathersjs/feathers' 
+import express from '@feathersjs/express'
+import socketio from '@feathersjs/socketio'
 
 
 export default class AppServer extends Server {
+  createServer(options = {}, context = {}) {
+    const app = super.createServer({ ...this.options, ...options, createServer: () =>  express(feathers())}, { ...this.context, ...context })
+    app.configure(socketio())
+    return app
+  }
+
   /**
    * Right now we hard-code which endpoints the AppServer mounts,
    * however we could make this more dynamic to turn endpoints on or off
@@ -34,22 +43,10 @@ export default class AppServer extends Server {
    * Serve any css, js, images, or fonts as static files
    */
   get serveStatic() {
-    return true;
+    return this.runtime.resolve('lib')
   }
 
   appWillMount(app, options = this.options) {
-
-    const game = this.runtime.game('texas-holdem', {
-      players: 9,
-      startingStack: 3000,
-      blinds: [5, 10],
-      gameId: 'chicago'
-    })
-
-    game.deal()
-
-    this.runtime.gamesMap.set("chicago", game)
-    
     app.use(bodyParser.json());
   }
 

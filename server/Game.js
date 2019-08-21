@@ -26,6 +26,10 @@ export class Game extends Helper {
     iteration: 0
   }
 
+  get gameId() {
+    return this.tryGet('gameId', this.uuid)
+  }
+  
   get uniqueId() {
     const gameId = this.tryGet("gameId", this.uuid);
     return [gameId, this.iteration, this.uuid].join(':')

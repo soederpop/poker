@@ -1,9 +1,11 @@
-import runtime from "@skypager/web";
+import runtime from "@skypager/web"
+import feathers from '@feathersjs/client' 
+import io from 'socket.io-client'
 
 const baseURL = runtime.get(
   "settings.client.baseURL",
   runtime.get("argv.baseUrl", `http://localhost:3000/api`)
-);
+)
 
 export const FLOP_FILTERS = {
   maxRank: "cardRank",
@@ -29,9 +31,26 @@ export const FLOP_FILTERS = {
   gaps: "array",
   openEnded: "boolean",
   possibleStraights: "boolean"
-};
+}
+
+const realTime = feathers()
 
 const client = {
+  getRealTime: () => realTime,
+
+  connect: () => {
+    const socket = io()
+    realTime.configure(feathers.socketio(socket))
+    return Promise.resolve(this)
+  },
+
+  service: (...args) => {
+    return realTime.service(...args)
+  },
+
+  getGamesService() {
+    return realTime.service('gamesService')
+  },
   /**
    * View information about a Range of hands
    *
@@ -46,7 +65,7 @@ const client = {
       params: { range, deadCards }
     })
       .then(r => r.data)
-      .catch(e => e.response);
+      .catch(e => e.response)
   },
 
   /**
@@ -61,7 +80,7 @@ const client = {
     return this.client
       .get(`${baseURL}/ranges/grid`)
       .then(r => r.data)
-      .catch(e => e.response);
+      .catch(e => e.response)
   },
 
   /**
@@ -74,14 +93,15 @@ const client = {
    * @param {Number} [options.startingStack=3000]
    * @param {Array<Number>} [options.blinds=[10,20]]
    */
-  createGame({ players = 9, startingStack = 3000, blinds = [10, 20] } = {}) {
+  createGame({ gameId, players = 9, startingStack = 3000, blinds = [10, 20] } = {}) {
     return this.client
       .post(`${baseURL}/games`, {
         players,
         startingStack,
-        blinds
+        blinds,
+        gameId
       })
-      .then(r => r.data);
+      .then(r => r.data)
   },
 
   /**
@@ -96,7 +116,7 @@ const client = {
     return this.client
       .get(`${baseURL}/games`)
       .then(r => r.data)
-      .catch(e => e.response);
+      .catch(e => e.response)
   },
 
   /**
@@ -111,10 +131,10 @@ const client = {
       .get(`${baseURL}/games/${gameId}`)
       .then(r => r.data)
       .then(data => {
-        runtime.setState({ [`game_${gameId}`]: data });
-        return data;
+        runtime.setState({ [`game_${gameId}`]: data })
+        return data
       })
-      .catch(e => e.response);
+      .catch(e => e.response)
   },
   /**
    * Record an action by a player in a game.
@@ -132,10 +152,10 @@ const client = {
       .post(`${baseURL}/games/${gameId}`, { action })
       .then(r => r.data)
       .then(data => {
-        runtime.setState({ [`game_${gameId}`]: data });
-        return data;
+        runtime.setState({ [`game_${gameId}`]: data })
+        return data
       })
-      .catch(e => e.response);
+      .catch(e => e.response)
   },
 
   /**
@@ -151,14 +171,14 @@ const client = {
   searchFlops(filters = {}) {
     return this.client({ url: `${baseURL}/ranges/flops`, params: filters })
       .then(r => r.data)
-      .catch(e => e.response);
+      .catch(e => e.response)
   }
-};
+}
 
 runtime.clients.register("game-api", () => ({
   interfaceMethods: Object.keys(client),
   ...client
-}));
+}))
 
 /**
  * @typedef {Object} GameAPIClient
@@ -173,8 +193,8 @@ runtime.clients.register("game-api", () => ({
 /**
  * @type {GameAPIClient}
  */
-const gameAPIClient = runtime.client("game-api");
+const gameAPIClient = runtime.client("game-api")
 
-runtime.api = gameAPIClient;
+runtime.api = gameAPIClient
 
-export default gameAPIClient;
+export default gameAPIClient

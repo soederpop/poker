@@ -4,11 +4,9 @@ const loadSource = process.env.NODE_ENV !== 'production'
 
 if (loadSource) {
   require('@babel/register')()
-  require('babel-plugin-require-context-hook/register')()
-} else {
-  console.log(process.argv)
-  process.exit(0)
 }
+
+require('babel-plugin-require-context-hook/register')()
 
 const framework = loadSource
   ? require('./server')

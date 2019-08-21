@@ -5,11 +5,11 @@
   "main": "index.js",
   "scripts": {
     "console": "NODE_ENV=development skypager console",
-    "start": "skypager serve",
+    "start": "NO_CLEAR=true NODE_ENV=production skypager serve --log-level debug --no-show-banner",
     "start:dev": "NODE_ENV=development skypager serve",
-    "build": "yarn build:client && yarn build:lib",
+    "build": "yarn build:webapp && yarn build:client && yarn build:lib",
     "build:client": "BUILD_ENV=build babel -d lib src/client.js",
-    "build:lib": "BUILD_ENV=build babel -d lib server",
+    "build:lib": "BUILD_ENV=build babel --copy-files -d lib server",
     "play": "BUILD_ENV=build skypager play --dev --babel",
     "build:webapp": "BUILD_ENV=build-web skypager build",
     "dev": "NODE_ENV=development skypager serve --hot --open",
@@ -27,12 +27,17 @@
   "author": "Jon Soeder <jon@chicago.com>",
   "license": "MIT",
   "skypager": {
+    "buildFolder": "lib",
     "webpacks": {
       "build": "webpack.config.js",
       "start": "webpack.config.js"
     }
   },
   "dependencies": {
+    "@feathersjs/client": "^3.7.8",
+    "@feathersjs/express": "^1.3.1",
+    "@feathersjs/feathers": "^3.3.1",
+    "@feathersjs/socketio": "^3.2.9",
     "@skypager/features-file-db": "^1.1.1",
     "js-combinatorics": "^0.5.4",
     "poker-tools": "^1.3.10",

@@ -25,9 +25,13 @@ export class GamePage extends Component {
     viewOptions: this.props.viewOptions
   }
 
+  receiveGameUpdate = (data = {}) => {
+    console.log('Received Game Update', data)
+  }
+
   async componentDidMount() {
     const { runtime } = this.context
-    const api = runtime.client('game-api')
+    const { api } = runtime
     const { gameId } = this.props.match.params
 
     try {
@@ -40,6 +44,28 @@ export class GamePage extends Component {
     } finally {
       this.setState({ loading: false })
     }
+
+    let gamesService
+
+    if (runtime.currentState.connected) {
+      console.log('listening for game update')
+      gamesService = runtime.api.gamesService;
+      gamesService.on("changed", this.receiveGameUpdate);
+    } else {
+      runtime.once("connected", () => {
+        console.log('connected now, listening for game update')
+        gamesService = runtime.api.gamesService;
+        gamesService.on("changed", this.receiveGameUpdate);
+      })
+    }
+
+    this.disconnect = () => {
+      gamesService && gamesService.off('changed', this.receiveGameUpdate)
+    }
+  }
+
+  componentWillUnmount() {
+    this.disconnect()
   }
 
   async refreshGame() {

@@ -1,7 +1,7 @@
 import React, { Component } from 'react'
 import types from 'prop-types'
 import { BrowserRouter, Switch, Route } from 'react-router-dom'
-import { Segment } from 'semantic-ui-react'
+import { Loader, Segment } from 'semantic-ui-react'
 import GamePage from './pages/GamePage'
 import GamesPage from './pages/GamesPage'
 import RangesPage from './pages/RangesPage'
@@ -66,7 +66,7 @@ export class App extends Component {
     }
   }
 
-  componentDidMount() {
+  async componentDidMount() {
     const { runtime } = this.props
     const { voiceCommander, keybindings } = runtime
 
@@ -92,6 +92,14 @@ export class App extends Component {
       keybindings.unbind('g f', this.toggleFlopBrowser)
       keybindings.unbind('g r', this.toggleRangeCalculator)
     }
+
+    console.log('connecting runtime')
+    runtime.api.connect().then(() => {
+      console.log('connected')
+      this.setState({ connected: true })
+      runtime.setState({ connected: true })
+      runtime.emit('connected')
+    })
   }
 
   componentWillUnmount() {
@@ -99,9 +107,13 @@ export class App extends Component {
   }
   
   render() {
-    const { activeTool } = this.state
+    const { connected, activeTool } = this.state
     const { runtime } = this.props
     const { DrawerLayout, Drawer: Controller } = runtime.workspace 
+
+    if (!connected) {
+      return <Loader active />
+    }
 
     const Drawer = (props) => 
       <Controller {...props}>
