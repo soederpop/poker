@@ -49,7 +49,7 @@ const client = {
   },
 
   getGamesService() {
-    return realTime.service('gamesService')
+    return realTime.service('games')
   },
   /**
    * View information about a Range of hands
@@ -113,7 +113,7 @@ const client = {
    */
 
   listGames(options = {}) {
-    return this.gamesService.find(options)
+    return this.gamesService.find(options).then(({ games }) => games)
   },
 
   /**

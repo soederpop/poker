@@ -12,7 +12,7 @@
     "build:lib": "BUILD_ENV=build babel --copy-files -d lib server",
     "play": "BUILD_ENV=build skypager play --dev --babel",
     "build:webapp": "BUILD_ENV=build-web skypager build",
-    "dev": "NODE_ENV=development skypager serve --hot --open",
+    "dev": "NO_CLEAR=true NODE_ENV=development skypager serve --hot --open --log-level=debug --no-display-banner",
     "dev:console": "yarn dev --silent --disable-logging --interactive",
     "test": "skypager test --mocha",
     "build:docker": "docker build -t datapimp/pokurr .",

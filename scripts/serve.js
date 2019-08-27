@@ -12,14 +12,16 @@ async function main() {
 
   await server.start()
 
-  await server.app.service('gamesService').create({
-    gameId: "chicago",
+  const { HandEquity, Range } = runtime
+
+  const games = server.app.service('/games')
+
+  await games.create({
+    gameId: 'chicago',
     players: 9,
     startingStack: 3000,
-    blinds: [5, 10]
+    blinds: [5, 10]  
   })
-
-  const { HandEquity, Range } = runtime
 
   if (runtime.argv.interactive) {
     await runtime.repl('interactive').launch({ server, api: runtime.api, game: runtime.gamesMap.get('chicago'), runtime, Range, HandEquity })

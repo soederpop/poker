@@ -3,7 +3,8 @@ import bodyParser from "body-parser";
 import feathers from '@feathersjs/feathers' 
 import express from '@feathersjs/express'
 import socketio from '@feathersjs/socketio'
-
+import channels from './channels' 
+import createHooks from './hooks'
 
 export default class AppServer extends Server {
   createServer(options = {}, context = {}) {
@@ -50,6 +51,33 @@ export default class AppServer extends Server {
     app.use(bodyParser.json());
   }
 
+  loadServices() {
+    const { app } = this
+    const servicesContext = require.context('./services', true, /index\.js$/)
+    const servicesPath = this.runtime.resolve('server', 'api', 'services')
+
+    app.hooks(createHooks(this))
+
+    servicesContext.keys().forEach((id) => {
+      const name = id.replace('./','').replace('/index.js', '')      
+      const serviceModule = require(this.runtime.pathUtils.resolve(servicesPath, id)) 
+      const service = serviceModule.default.call(this, this)
+
+      app.use(`/${name}`, service)
+
+      console.log('service module', serviceModule)
+      if (serviceModule.createHooks) {
+        app.service(`/${name}`).hooks(
+          serviceModule.createHooks.call(this, this)
+        )
+      }
+    })
+
+    channels(app)
+
+    return app
+  }
+
   /**
    * @private
    * @see @skypager/helpers-server for information about Server class lifecycle hooks
@@ -64,6 +92,10 @@ export default class AppServer extends Server {
     if (this.runtime.isDevelopment) {
       setupDevelopment.call(this, app)
     }
+
+
+    this.loadServices()
+
     return app
   }
 }
