@@ -1,25 +1,103 @@
 let gamesMap = new Map()
 
 class GameService {
+  static setupChannels(app) {
+    app.service('gamesService').publish('updated', (data = {}, context = {}) => {
+      console.log('updated event', data)  
+      return null
+    })
+  }
+
   constructor({ server, runtime }) {
     this.server = server
     this.runtime = runtime
     this.events = ['created', 'updated', 'patched', 'removed', 'changed'] 
   }
 
+  async update(gameId, data = {}, params={}) {
+    const game = gamesMap.get(gameId)    
+
+    console.log('Updating', gameId)
+    if (data && data.action) {
+      const { type, amount, playerId, ...rest } = data.action;
+      
+      console.log({ type, amount, playerId })
+
+      if (type === "deal") {
+        game.deal();
+      } else if (type === "equity") {
+        await game.calculateEquity();
+      } else if (type === "reset") {
+        game.reset();
+        game.deal();
+      } else if (type === "button") {
+        game.state.set(
+          "dealer",
+          data.seat || (game.dealerSeat === 9 ? 1 : game.dealerSeat + 1)
+        );
+      } else if (type === "simulate") {
+        game.currentActor.act();
+      } else {
+        console.log('Recording Action')
+        await game.recordAction({ playerId, action: type, amount });
+      }
+    }
+
+    const gameJson = game.toJSON()
+
+    const resp = this.runtime.lodash.cloneDeep(gameJson)
+
+    console.log(resp)
+    return resp
+  }
+  
+  async find(params = {}) {
+    const games = Array.from(gamesMap.values())
+
+    return games.map(game => ({
+      ...game.currentState,
+      ...game.stats
+    }))
+  }
+
   async get(id) {
     const game = gamesMap.get(id)    
     return game.toJSON()
+  }
+
+  async create(params = {}) {
+    const { gameType = 'texas-holdem', gameId = this.runtime.lodash.uniqueId(gameType), players = 9, blinds = [5, 10], startingStack = 3000, cards } = params
+
+    const game = this.runtime.game(gameType, {
+      gameId,
+      players,
+      blinds,
+      startingStack,
+      ...(cards && { cards })
+    });
+  
+    gamesMap.set(game.gameId, game);
+  
+    game.deal();
+  
+    this.runtime.emit("gameWasCreated", game);
+  
+    game.state.observe(() => {
+      this.runtime.info(`Game State Change`, game.chain.pick('stage','pot','gameId', 'actionSeat').value())
+      this.publish('changed', game.toJSON())
+    });    
+
+    return this.runtime.lodash.cloneDeep(game.toJSON())
   }
 }
 
 export default async function setupGamesEndpoints(app) {
   gamesMap = this.runtime.gamesMap = this.runtime.gamesMap || gamesMap
   
-  app.use('gamesService', new GameService({ server: this, runtime: this.runtime }))
+  const gamesService = new GameService({ server: this, runtime: this.runtime });
+  app.use('gamesService', gamesService)
+  GameService.setupChannels(app)
   
-  this.runtime.on('gameWasCreated', connectGameToService.bind(this, app))
-
   app.on('connection', (connection) => {
     app.channel('observers').join(connection)
   })
@@ -121,19 +199,10 @@ export async function sendGameAction(req, res) {
   }
 
   try {
-    res.status(200).json(game.toJSON());
+    const gameJson = game.toJSON();
+    res.status(200).json(runtime.lodash.cloneDeep(gameJson));
   } catch (error) {
     this.runtime.error(`Error serving game info`, error);
     res.status(500).json({ error: error.message });
   }  
-}
-
-export async function connectGameToService(app, game) {
-  game.state.observe(() => {
-    Promise.resolve(app.service('gamesService').publish('changed', {
-      gameId: game.gameId
-    })).then(() => {
-      this.runtime.info('Published change change event', game.gameId)
-    })    
-  })
 }

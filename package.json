@@ -37,6 +37,11 @@
       "start": "webpack.config.js"
     }
   },
+  "directories": {
+    "lib": "server",
+    "test": "test/",
+    "config": "config/"
+  },
   "dependencies": {
     "@feathersjs/client": "^3.7.8",
     "@feathersjs/express": "^1.3.1",

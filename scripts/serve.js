@@ -12,7 +12,7 @@ async function main() {
 
   await server.start()
 
-  await runtime.api.createGame({
+  await server.app.service('gamesService').create({
     gameId: "chicago",
     players: 9,
     startingStack: 3000,

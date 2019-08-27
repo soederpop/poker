@@ -4,7 +4,7 @@ import io from 'socket.io-client'
 
 const baseURL = runtime.get(
   "settings.client.baseURL",
-  runtime.get("argv.baseUrl", `http://localhost:3000/api`)
+  runtime.get("argv.baseUrl", `/api`)
 )
 
 export const FLOP_FILTERS = {
@@ -94,14 +94,14 @@ const client = {
    * @param {Array<Number>} [options.blinds=[10,20]]
    */
   createGame({ gameId, players = 9, startingStack = 3000, blinds = [10, 20] } = {}) {
-    return this.client
-      .post(`${baseURL}/games`, {
-        players,
-        startingStack,
-        blinds,
-        gameId
-      })
-      .then(r => r.data)
+    const data = {
+      players,
+      startingStack,
+      blinds,
+      gameId
+    };
+    
+    return this.gamesService.create(data)
   },
 
   /**
@@ -113,10 +113,7 @@ const client = {
    */
 
   listGames(options = {}) {
-    return this.client
-      .get(`${baseURL}/games`)
-      .then(r => r.data)
-      .catch(e => e.response)
+    return this.gamesService.find(options)
   },
 
   /**
@@ -127,14 +124,7 @@ const client = {
    * @param {String} gameId the unique id of the game
    */
   showGame(gameId) {
-    return this.client
-      .get(`${baseURL}/games/${gameId}`)
-      .then(r => r.data)
-      .then(data => {
-        runtime.setState({ [`game_${gameId}`]: data })
-        return data
-      })
-      .catch(e => e.response)
+    return this.gamesService.get(gameId)
   },
   /**
    * Record an action by a player in a game.
@@ -148,14 +138,7 @@ const client = {
    * @param {String} action.playerId
    */
   action(gameId, action = {}) {
-    return this.client
-      .post(`${baseURL}/games/${gameId}`, { action })
-      .then(r => r.data)
-      .then(data => {
-        runtime.setState({ [`game_${gameId}`]: data })
-        return data
-      })
-      .catch(e => e.response)
+    return this.gamesService.update(gameId, { action })
   },
 
   /**

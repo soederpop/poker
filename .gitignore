@@ -1,5 +1,6 @@
 lib/
 data/
+config/
 db/
 secrets/
 node_modules/
