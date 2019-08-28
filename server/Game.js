@@ -105,6 +105,16 @@ export class Game extends Helper {
     return this.state.get('dealer') || 1
   }
 
+  /** 
+   * If the dealer folds, then we go to the dealers right 
+  */
+  get lastToActSeat() {
+    const { keyBy } = this.lodash
+    const players = keyBy(this.playerData.values(), 'seat')
+    const lastPlayer = this.actionOrder.map(seat => players[seat]).filter(player => player.inHand).pop()
+    return lastPlayer.seat
+  }
+
   get potOdds() {
     return 1 / (1 / parseFloat((this.pot / this.toGo).toFixed(2)))
   }
@@ -126,6 +136,14 @@ export class Game extends Helper {
     return max(stageActions.map(({ amount = 0 }) => amount)) || 0
   }
 
+  get amountsInvestedByPlayerThisStage() {
+    const { mapValues } = this.lodash
+    const base = this.chain.get('playersInHand').mapValues(v => 0).value()
+    const amounts = this.chain.get('stageActions').groupBy('playerId').mapValues((actions) => this.lodash.sumBy(actions, 'amount')).value()
+
+    return mapValues({ ...base, ...amounts }, v => v || 0)
+  }
+  
   get amountsInvestedByPlayer() {
     return this.chain.get('actions').groupBy('playerId').mapValues((actions) => this.lodash.sumBy(actions, 'amount')).value()
   }
@@ -292,39 +310,42 @@ export class Game extends Helper {
       this.state.set('lastBetSeat', player.seat)
     }
 
+    this.state.set('actions', actions)
+
     // these are the only actions that can close off the action
     if (action === 'check' || action === 'call' || action === 'fold') {
       this.runtime.debug('Checking if we can close the betting round', {
         action,
         finalActionSeat: this.finalActionSeat,
         previousActionSeat: this.previousActionSeat,
-        actionIsClosed: this.actionIsClosed
+        isActionClosed: this.isActionClosed
       })
 
-      if (this.isActionClosed && this.potIsGood) {
+      if (this.isActionClosed && this.isPotGood) {
+        this.runtime.debug('Trying to finalize round')
         this.finalizeRound()      
       }
     }
 
-    this.state.set('actions', actions)
 
     return this
   }
 
   finalizeRound() {
-    const { round, remainingPlayers = [], pot } = this        
+    const { round, playersInHand, pot } = this        
 
     if (!round) {
       return
     }
 
+    const playerIdsInHand = Object.keys(playersInHand)
+
     this.runtime.debug('Finalizing Round', {
       stage: this.stage,
       isActionClosed: this.isActionClosed,
-      remainingPlayers: this.remainingPlayers
     })
 
-    if (this.isActionClosed && remainingPlayers.length === 1) {
+    if (this.isActionClosed && playerIdsInHand.length === 1) {
       this.runtime.debug(`Awarding pot to remaining winner`)
       this.awardPotToWinners()
 
@@ -332,11 +353,11 @@ export class Game extends Helper {
         this.reset()
         this.state.set('dealer', this.dealerSeat === 9 ? 1 : this.dealerSeat + 1)
       })
-    } else if (this.stage !== 'river' && (this.playersLeftToAct === 0 || this.actionIsClosed)) {
+    } else if (this.stage !== 'river' && (this.playersLeftToAct === 0 || this.isActionClosed)) {
       this.runtime.debug(`Action is closed, stage is not river. Auto-dealing.`, {
         stage: this.stage,
         playersLeftToAct: this.playersLeftToAct,
-        actionIsClosed: this.actionIsClosed
+        isActionClosed: this.isActionClosed
       })
       this.deal()
     }
@@ -377,7 +398,7 @@ export class Game extends Helper {
     }
 
     if (!this.isPotRaised) {
-      return this.dealerSeat
+      return this.lastToActSeat
     }
 
     const order = this.getActionOrder(this.lastBetSeat).filter(i => i !== this.lastBetSeat)
@@ -415,6 +436,17 @@ export class Game extends Helper {
       }
   
       if (this.actionSeat === this.lastBetSeat) {
+        return true
+      }
+    } else if (!this.isPotRaised && this.isPotGood) {
+      this.runtime.debug('no raised pot, pot is good', {
+        previousActionSeat: this.previousActionSeat,
+        finalActionSeat: this.finalActionSeat,
+        stage: this.stage
+      })
+
+      if (this.previousActionSeat === this.finalActionSeat) {
+        this.runtime.debug('Action is closed')
         return true
       }
     }
@@ -484,13 +516,25 @@ export class Game extends Helper {
       .filter(actor => actor.playerData.inHand)
   }
 
+  get foldedPlayers() {
+    return this.chain
+      .get('actions')
+      .filter({ action: 'fold' })
+      .map('playerId')
+      .value()    
+  }
+
   get remainingPlayers() {
-    const folded = this.chain.get('actions').filter({ action: 'fold' }).map('playerId').value()
+    const folded = this.foldedPlayers 
     return this.remainingActionOrder.map(seat => this.seat(seat)).filter(p => folded.indexOf(p.playerId) === -1)
   }
 
   get isPotGood() {
-    return !this.allActors.find(actor => actor.toGo > 0)
+    const { omit } = this.lodash
+    const { amountsInvestedByPlayerThisStage, toGo } = this
+    const owed = Object.values(omit(amountsInvestedByPlayerThisStage, this.foldedPlayers))
+
+    return owed.every(amount => amount === toGo)
   } 
 
   get eligiblePlayers() {
@@ -929,6 +973,10 @@ export class Game extends Helper {
       .value()
   }
 
+  get playersInHand() {
+    return this.chain.get('players').pickBy('inHand').value()
+  }
+
   get playersInRange() {
     return this.chain
       .get('playerCombos')
@@ -1145,6 +1193,7 @@ export class Game extends Helper {
       currentPlayer: this.currentPlayer && this.currentPlayer.playerId,
       isActionClosed: this.isActionClosed,
       isPotRaised: this.isPotRaised,
+      isPotGood: this.isPotGood,
       toGo: this.toGo,
       stage: this.stage,
       board: this.board,

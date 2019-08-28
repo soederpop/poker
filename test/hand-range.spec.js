@@ -56,9 +56,6 @@ describe('Hand Range', function() {
       combined.normalizedComboNames.should.include('AKs','AQs', 'AJs', 'ATs', 'KQs', 'KJs', 'KTs', 'QJs', 'QTs', 'TJs', '99', '88', '77', '66', '55', '44', '33', '22', '87s', '98s', 'T9s')
       combined.size.should.equal(totalSum)
       combined.size.should.equal(112)
-
-      console.log(combined.input)
-      console.log(combined.normalizedComboNames)
     })
   })
 })

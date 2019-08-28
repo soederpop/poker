@@ -25,8 +25,8 @@ export class GamePage extends Component {
     viewOptions: this.props.viewOptions
   }
 
-  receiveGameUpdate = (data = {}) => {
-    console.log('Received Game Update', data)
+  receiveGameUpdate = ({ data } = {}) => {
+    this.refreshGame()
   }
 
   async componentDidMount() {
@@ -100,7 +100,7 @@ export class GamePage extends Component {
       return <div />
     } else {
       return (
-        <Segment inverted basic style={{ display: 'none', margin: '0px auto', width: '1280px' }}>
+        <Segment inverted basic style={{ margin: '0px auto', width: '1280px' }}>
           <GameTable game={game} viewOptions={viewOptions} />
           <GameControls 
             onUpdate={() => this.refreshGame()} 

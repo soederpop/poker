@@ -28,17 +28,12 @@ export class GameTable extends Component {
     return { game: this.state.game }
   }
 
-  componentDidMount() {
+  componentDidUpdate(prevProps) {
     const { game } = this.props
-    this.disposer = this.context.runtime.state.observe(({ name, newValue }) => {
-      if (name === `game_${game.id}`) {
-        this.setState({ game: newValue })
-      }
-    })
-  }
 
-  componentWillUnmount() {
-    this.disposer()
+    if (prevProps.game.hash !== game.hash) {
+      this.setState({ game: this.props.game })
+    }
   }
 
   render() {
