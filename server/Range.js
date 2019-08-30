@@ -13,6 +13,21 @@ export const flopsMap = new Map()
 export const turnsMap = new Map()
 export const riversMap = new Map()
 
+const originalGet = combosMap.get.bind(combosMap)
+
+combosMap.get = (key = '') => {
+  if (combosMap.has(key)) {
+    return originalGet(key)
+  }
+
+  const chars = key.split('')
+  const reversed = [ chars[2], chars[3], chars[0], chars[1]].join('')
+
+  if (combosMap.has(reversed)) {
+    return originalGet(reversed) 
+  }
+}
+
 export const SKLANKSY_RANGES = { 
   '1': 'AA,KK,QQ,JJ,AKs',
   '2': 'TT,AQs,AJs,KQs,AKo',
@@ -127,9 +142,20 @@ export default class Range {
    * @param {String} rangeInput the written hand range notation
    * @param {Array<CardName>} [deadCards=[]] cards which are known to be dead, so not to be included in the range. 
   */
-  constructor(rangeInput = '', deadCards = []) {
+  constructor(rangeInput = '', deadCards = [], numberOfOpponents = 6) {
     this.deadCards = deadCards 
     this.input = rangeInput
+    this.numberOfOpponents = numberOfOpponents 
+
+    Object.defineProperty(this, 'excludedCombos', {
+      value: new Map(),
+      enumerable: true,
+    })
+
+    Object.defineProperty(this, 'includedCombos', {
+      value: new Map(),
+      enumerable: true,
+    })   
   }
 
   /** 
@@ -187,7 +213,18 @@ export default class Range {
    * @type {Number}
   */
   get strength() {
-    return (this.size / this.constructor.combos.length) * 100
+    const strengthRange = Range.strongestVsOpponents(this.numberOfOpponents)
+    const orderedNames = strengthRange.map(i => i[0]) 
+
+    const size = strengthRange.length
+    const positions = this.normalizedComboNames.map(combo => {
+      const index = orderedNames.indexOf(combo)
+      const numberOfBetterHands = size - (size - index)
+
+      return [combo, 100 - Math.round(numberOfBetterHands / 169 * 100)]
+    })
+
+    return meanBy(positions, '1')
   }
 
   /** 
@@ -211,7 +248,56 @@ export default class Range {
   */
   get combos() {
     const notDead = (comboName) => !this.deadCards.find(card => comboName.indexOf(card) >= 0)
-    return Range.filterCombos(this.input).filter(combo => notDead(combo.name))
+    const matches = Range.filterCombos(this.input).filter(combo => notDead(combo.name))
+
+    return uniqBy(matches.concat(this.additionalCombos), 'name').filter(combo => !this.excludedCombos.has(combo.name))
+  }
+
+  exclude(comboString) {
+    const combo = Range.combosMap.get(comboString)
+
+    if (combo) {
+      this.includedCombos.delete(combo.name)
+      this.excludedCombos.set(combo.name, combo.name)
+      return this
+    }
+
+    Range.fromString(comboString)
+      .forEach(combo => {
+        this.includedCombos.delete(combo.name)
+        this.excludedCombos.set(combo.name, combo.name)
+      })
+
+    return this
+  }
+
+  include(comboString) {
+    const combo = Range.combosMap.get(comboString)
+
+    if (combo) {
+      this.excludedCombos.delete(combo.name) 
+      this.includedCombos.set(combo.name, combo.name)
+      return this
+    }
+
+    Range.fromString(comboString)
+      .forEach(combo => {
+        this.excludedCombos.delete(combo.name) 
+        this.includedCombos.set(combo.name, combo.name)
+      })
+
+    return this
+  }
+
+  includes(key) {
+    const chars = key.split('')
+    const reversed = [chars[2], chars[3], chars[0], chars[1]].join('')
+    return !!(this.combos.find(combo => combo.name === reversed || combo.name === key) || this.combos.find(combo => combo.normalized === key))
+  }
+
+  get additionalCombos() {
+    const notDead = (comboName) => !this.deadCards.find(card => comboName.indexOf(card) >= 0)
+    return Array.from(this.includedCombos.keys()).map(comboName => Range.combosMap.get(comboName)).filter(combo => notDead(combo.name))
   }
 
   /** 
@@ -616,7 +702,7 @@ export default class Range {
    * 
    * @returns {Array<ComboName>}
   */
-  static strongestHands(percent, numberOfOpponents = 9) {
+  static strongestHands(percent, numberOfOpponents = 8) {
     const limit = Math.floor(169 * (percent / 100))
 
     return this.chains.combos
@@ -626,6 +712,15 @@ export default class Range {
       .slice(0, limit)
       .map('normalized')
       .value()
+  }
+
+  static strongestVsOpponents(numberOfOpponents) {
+     return this.chains.combos
+      .uniqBy('normalized')
+      .sortBy(`strengthVsOpponents.${numberOfOpponents}`)
+      .reverse()
+      .map(combo => [combo.normalized, combo.strengthVsOpponents[numberOfOpponents]])
+      .value()   
   }
 
   /** 
@@ -1121,6 +1216,7 @@ export default class Range {
           : rankValues[0] - rankValues[1] === 4,
   
       suited: modifier.toLowerCase().startsWith("s"),
+      offsuit: modifier.toLowerCase().startsWith("o"),
       greater: modifier.toLowerCase().endsWith("+"),
       weaker: modifier.toLowerCase().endsWith("-"),
       ranks: rankValues,
@@ -1257,12 +1353,9 @@ export function groups() {
 
 const filterCombo = (combo, filters) => {
   let match = true;
-  const { item, ranged, top, bottom, pair, suited, greater, weaker, rank, kicker, connected, oneGap, twoGap, threeGap } = filters      
+  const { item, ranged, top, bottom, pair, suited, greater, weaker, rank, kicker, offsuit, connected, oneGap, twoGap, threeGap } = filters      
   // a pair is always greater than a non-pair range
 
-  if (combo.normalized === 'KQs') {
-    debugger
-  }
   if (ranged) {
     return filterCombo(combo, {
       ...top,
@@ -1284,6 +1377,10 @@ const filterCombo = (combo, filters) => {
 
   if (suited && !combo.suited) {
     return false;
+  }
+
+  if (offsuit && combo.suited) {
+    return false
   }
 
   /*

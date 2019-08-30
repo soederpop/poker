@@ -22,10 +22,31 @@ async function main() {
   });
 
   const api = runtime.client('game-api')
+  const cards = {
+    P2: [{ rank: "A", suit: "h" }, { rank: "K", suit: "h" }],
+    P3: [{ rank: "A", suit: "c" }, { rank: "K", suit: "c" }],
+  }
+  const board = [
+    { rank: "A", suit: "d" },
+    { rank: "K", suit: "d" },
+    { rank: "Q", suit: "d" },
+    { rank: "J", suit: "d" },
+    { rank: "T", suit: "d" },
+  ]
+
+  const game2 = runtime.game('texas-holdem', {
+    board,
+    cards,
+    players: 9,
+    startingStack: 1000,
+    autoDeal: false 
+  })    
 
   await runtime.repl('interactive').launch({
     runtime,
     game,
+    game2,
+    g2: game2,
     hand,
     Range: runtime.Range,
     HandEquity: runtime.HandEquity,

@@ -89,7 +89,7 @@ export default class AppServer extends Server {
   async appDidMount(app) {
     await this.runtime.fileDb.load()
 
-    if (this.runtime.isDevelopment) {
+    if (this.runtime.isDevelopment && !this.options.webpack === false) {
       setupDevelopment.call(this, app)
     }
 

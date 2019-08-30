@@ -8,3 +8,4 @@ node_modules/
 *.sock
 .tmp
 .DS_Store
+game-dumps/

@@ -1,58 +1,18 @@
 export function deal(options = {}) {
-  const { round, playerIds = [] } = this
+  const { playerIds, round } = this
 
-  const ranks = {
-    T: 10,
-    t: 10,
-    k: 'king',
-    a: 'ace',
-    q: 'queen',
-    j: 'jack',
-  } 
-
-  const suits = {
-    h: 'hearts',
-    c: 'clubs',
-    d: 'diamonds',
-    s: 'spades'
-  }
-
-  const createCard = ({ retry = 0, suit = undefined, rank = undefined, label }) => {
-    const args = []
-
-    if (suit && rank) {
-      args.push( 
-        suits[ String(suit).toLowerCase() ] || suit, 
-        ranks[ String(rank).toLowerCase() ] || rank
-      )
-    }
-
-    try {
-      const card = this.chain
-      .invoke("deck.createCard", ...args)
-      .thru(card => {
-        card.owner = label;
-        card.name = this.describeCard(card)
-        return card;
-      })
-      .value();
-
-      return card
-    } catch(error) {
-      if (retry < 3) {
-        return createCard({ suit, rank, label, retry: retry + 1 })
-      }
-
-      throw new Error(`Invalid Card: ${error} ${suit} ${rank} `)
-    }
-
-  }
+  let board = this.state.get('boardPresets') || []
+  let assignedCards = this.state.get('cardPresets') || this.chain.get('players').mapValues(v => []);
 
   if (round === 0) {
+    !this.deck && this.initializeDeck()
+    board = this.state.get('boardPresets') || []
+    assignedCards = this.state.get('cardPresets') || this.chain.get('players').mapValues(v => []);
     const smallBlind = this.seat(this.smallBlindSeat);
     const bigBlind = this.seat(this.bigBlindSeat);
 
     this.state.set('pot', 0)
+    this.state.set('actions', [])
 
     this.recordAction({
       playerId: smallBlind.playerId,
@@ -71,14 +31,13 @@ export function deal(options = {}) {
         this.recordAction({ playerId, action: "post", amount: this.anteAmount })
       }
 
-      const cards = this.tryGet('cards', {})
-      const assignedCards = cards[playerId] || []
+      const playerCards = assignedCards[playerId] || []
 
       this.updatePlayer(playerId, {
         inHand: true,
-        cards: assignedCards.length 
-          ? assignedCards.map(({ suit, rank }) => createCard({ suit, rank, label: playerId }))
-          : [createCard({ label: playerId }), createCard({ label: playerId })]
+        cards: playerCards.length 
+          ? playerCards 
+          : [this.createCard({ label: playerId }), this.createCard({ label: playerId })]
       })
     })
 
@@ -86,25 +45,27 @@ export function deal(options = {}) {
 
   } else if (round === 1) {
     this.state.set('stage', 'flop')
+
     this.updateBoard({
-      flop: [
-        createCard({ label: "board" }), 
-        createCard({ label: "board" }), 
-        createCard({ label: "board" })
+      flop: board.length >= 3 ? board.slice(0, 3) : [
+        this.createCard({ label: "board" }), 
+        this.createCard({ label: "board" }), 
+        this.createCard({ label: "board" })
       ]
     })
+
     this.readyForAction(true, { action: this.firstToActSeat })
     
   } else if (round === 2) {
     this.state.set('stage', 'turn')
     this.updateBoard({
-      turn: [createCard({ label: "board" })]
+      turn: board.length >= 4 ? [board[3]] : [this.createCard({ label: "board" })]
     })
     this.readyForAction(true, { action: this.firstToActSeat })
   } else if (round === 3) {
     this.state.set('stage', 'river')
     this.updateBoard({
-      river: [createCard({ label: "board" })]
+      river: board.length >= 5 ? [board[4]] : [this.createCard({ label: "board" })]
     })
     this.readyForAction(true, { action: this.firstToActSeat })
   }

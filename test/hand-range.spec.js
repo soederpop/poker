@@ -12,8 +12,6 @@ const individual = [
   ["87s", 4]
 ];    
 
-const totalSum = runtime.lodash.sumBy(individual, '1')
-
 describe('Hand Range', function() {
   describe('parsing common range notations', function() {
     it('understands plus signs', function() {
@@ -51,11 +49,11 @@ describe('Hand Range', function() {
 
   describe('Combined Ranges', function() {
     it('can combine multiple range notations separated by commas', function() {
-      const combined = new Range(individual.map(i => i[0]).join(","));
+      const combinedInput = individual.map(i => i[0]).join(',')
+      const combined = new Range(combinedInput);
 
       combined.normalizedComboNames.should.include('AKs','AQs', 'AJs', 'ATs', 'KQs', 'KJs', 'KTs', 'QJs', 'QTs', 'TJs', '99', '88', '77', '66', '55', '44', '33', '22', '87s', '98s', 'T9s')
-      combined.size.should.equal(totalSum)
-      combined.size.should.equal(112)
+      combined.size.should.equal(100, `${combinedInput} should represent 100 combos`)
     })
   })
 })

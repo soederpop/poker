@@ -1,6 +1,6 @@
 import React, { Component } from 'react'
 import types from 'prop-types'
-import { Text, Box } from 'ink'
+import { Color, Text, Box } from 'ink'
 import runtime from '@skypager/node'
 import CardGroup from './CardGroup'
 import boxen from 'boxen'
@@ -99,14 +99,16 @@ export class Seat extends Component {
     return (
       <Box flexDirection="column" width={20}>
         <Box width={20}>
-          <Text underline>{playerLabel}</Text>  
+          {inHand && <Text underline>{playerLabel}</Text>}
+          {!inHand && <Color dim>{playerLabel}</Color>}
         </Box>
         <Box>
           {!cards.length && <CardGroup blanks={2} />}
           {!!(cards && cards.length) && <CardGroup dimmed={!inHand} cards={cards} box={{ padding: 0 }} />}
         </Box>
         <Box width={20} minHeight={2}>
-          <Text underline bold>{labelText}</Text>
+          {inHand && <Text underline bold>{labelText}</Text>}
+          {!inHand && <Color dim>{labelText}</Color>}
         </Box>
       </Box>
     )

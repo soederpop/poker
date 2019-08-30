@@ -29,11 +29,23 @@ export function App(props = {}) {
     })
   }, [game.hash])
 
+  useEffect(() => {
+    const autoCalculate = () => {
+      game.runtime.argv.autoCalculate !== false && Promise.resolve(game.calculateEquity())
+    }
+
+    game.on('round', autoCalculate)
+
+    return () => game.off('round', autoCalculate)
+  }, [game.round])
+
   useKeyHandler(data => {
     if (data === 'q') process.exit(0)
     
     if (data === 'a') {
-      game.currentActor.act()
+      if (!game.isHandFinished) {
+        game.currentActor.act()
+      }
     }
     
     if (data === 'd') {

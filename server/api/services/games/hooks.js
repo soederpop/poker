@@ -18,14 +18,22 @@ export default function createHooks(server, options) {
     runtime.debug(`Game Service observing ${result.id}`)
     const game = service.gamesMap.get(result.id)
 
-    const publisher = () => {
+    const publisher = debounce(() => {
       service.emit('changed', {
         type: 'changed',
         data: game.toJSON(),
       })
-    }
+    }, 100)
 
-    observing[game.gameId] = game.state.observe(debounce(publisher, 100))
+    observing[game.gameId] = game.state.observe(({ name }) => {
+      if(name === 'actions' || name === 'actionSeat' || name === 'round') {
+        publisher()  
+      }
+    })
+
+    game.stageEquities.observe(publisher)
+
+    game.on('didDeal', () => game.calculateEquity())
 
     return context
   }
