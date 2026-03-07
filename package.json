@@ -8,7 +8,10 @@
   "scripts": {
     "build:wasm": "bun run --cwd packages/pokurr-equity build",
     "test": "bun run build:wasm && bun test packages/pokurr-core/test test",
-    "demo:js-api": "bun run ../../luca/src/cli/cli.ts run demos/js-api.md"
+    "demo:js-api": "luca run demos/js-api.md"
+  },
+  "dependencies": {
+    "@soederpop/luca": "*"
   },
   "luca": {
     "aliases": ["luca-poker", "poker", "poker app", "poker playground"]

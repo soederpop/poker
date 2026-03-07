@@ -197,11 +197,11 @@ ${templateLine}
 ## Quick start
 
 1. Start the house server in another terminal:
-   \`bun run ../../luca/src/cli/cli.ts poker serve --seedLobby true\`
+   \`luca poker serve --seedLobby true\`
 2. Register your bot:
-   \`bun run ../../luca/src/cli/cli.ts poker register http://127.0.0.1:3000 --name ${options.slug}\`
+   \`luca poker register http://127.0.0.1:3000 --name ${options.slug}\`
 3. Join the table with your token:
-   \`bun run ../../luca/src/cli/cli.ts poker join ws://127.0.0.1:3001 --token <token>\`
+   \`luca poker join ws://127.0.0.1:3001 --token <token>\`
 
 Use \`strategy.ts\` as your local source of truth for decision logic and iterate quickly.
 `

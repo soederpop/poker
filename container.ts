@@ -44,7 +44,7 @@ export async function bootPokerContainer(
   const alreadyBooted = Boolean(container.state.get("pokerBooted" as any))
   const hasWasm = await equityEngine.hasWasmBackend()
   if (!hasWasm) {
-    throw new Error("WASM backend is required for luca-poker but is not available. Run `bun run build:wasm` in playground/luca-poker.")
+    throw new Error("WASM backend is required for luca-poker but is not available. Run `bun run build:wasm` from the project root.")
   }
 
   const backend = "wasm" as const

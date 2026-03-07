@@ -13,10 +13,10 @@ Run it with:
 luca run demos/js-api.md
 ```
 
-If you do not have a globally compiled `luca` binary yet, run from this directory:
+Install the `luca` CLI if you haven't already:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts run demos/js-api.md
+npm i -g @soederpop/luca
 ```
 
 ## Load the API in the VM Context

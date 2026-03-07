@@ -1,19 +1,19 @@
 # Local Beta Demo
 
-This walkthrough is for a fully local run from `playground/luca-poker`.
+This walkthrough is for a fully local run from the `luca-poker` project root.
 
 ## 1) Start Clean
 
 From this directory:
 
 ```bash
-cd /Users/jon/@soederpop/playground/luca-poker
+cd luca-poker
 ```
 
 Start the server:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker serve \
+luca poker serve \
   --host 127.0.0.1 \
   --port 3000 \
   --seedLobby true
@@ -27,7 +27,7 @@ bun run ../../luca/src/cli/cli.ts poker serve \
 In another terminal, reset leaderboard baseline:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker leaderboard reset --server http://127.0.0.1:3000
+luca poker leaderboard reset --server http://127.0.0.1:3000
 ```
 
 ## 2) Seed Bot Accounts
@@ -35,7 +35,7 @@ bun run ../../luca/src/cli/cli.ts poker leaderboard reset --server http://127.0.
 Create 4 bot accounts and persist credentials to `.env`:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker seed http://127.0.0.1:3000 --seedCount 4 --seedPrefix beta-bot
+luca poker seed http://127.0.0.1:3000 --seedCount 4 --seedPrefix beta-bot
 ```
 
 This command writes a managed credentials block into `./.env` with:
@@ -60,7 +60,7 @@ for BOT_ID in "${BOT_IDS[@]}"; do
   TOKEN_VAR="POKER_BOT_${SAFE_ID}_TOKEN"
   TOKEN="${!TOKEN_VAR}"
 
-  bun run ../../luca/src/cli/cli.ts poker join \
+  luca poker join \
     ws://127.0.0.1:3001 \
     --token "$TOKEN" \
     --strategy tag &
@@ -70,14 +70,14 @@ done
 Notes:
 
 - `join` defaults to the first available table unless `--table` is set.
-- stop all clients with `pkill -f "luca/src/cli/cli.ts poker join"` or close their terminals.
+- stop all clients with `pkill -f "luca poker join"` or close their terminals.
 
 ## 4) Observe Runtime + Results
 
 House status:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker house status --server http://127.0.0.1:3000
+luca poker house status --server http://127.0.0.1:3000
 ```
 
 House bankroll:
@@ -103,7 +103,7 @@ curl -s http://127.0.0.1:3000/api/v1/tournaments/live | jq
 Watch from terminal:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker watch ws://127.0.0.1:3002
+luca poker watch ws://127.0.0.1:3002
 ```
 
 Web views:

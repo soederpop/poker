@@ -23,14 +23,14 @@ The goal is one shared poker core that supports:
 - `bun`
 - Rust toolchain (`rustup`, `cargo`)
 - `wasm-pack` on your `PATH` (or the scripts should point to your cargo bin location)
-- Luca CLI source available in this mono-repo (`../../luca/src/cli/cli.ts`)
+- `@soederpop/luca` CLI (`npm i -g @soederpop/luca` or install via the project dependencies)
 
 ## Quick Start
 
 From this directory:
 
 ```bash
-cd /Users/jon/@soederpop/playground/luca-poker
+cd luca-poker
 bun install
 bun run build:wasm
 bun run test
@@ -44,7 +44,7 @@ Run the runnable markdown API walkthrough:
 bun run demo:js-api
 ```
 
-This executes [js-api.md](/Users/jon/@soederpop/playground/luca-poker/demos/js-api.md) in Luca VM, demonstrates:
+This executes [js-api.md](demos/js-api.md) in Luca VM, demonstrates:
 
 - module loading from source
 - cards/deck/range APIs
@@ -111,9 +111,9 @@ Rust internals stay behind `@pokurr/equity` and should remain an implementation 
 From this directory:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker analyze equity AhKd QsQc --iterations 20000
-bun run ../../luca/src/cli/cli.ts poker analyze range "ATs+,AJo+" --vs "QQ+,AKs"
-bun run ../../luca/src/cli/cli.ts poker analyze hand AhQh --board Kh7d2h5h --potSize 42 --toCall 14
+luca poker analyze equity AhKd QsQc --iterations 20000
+luca poker analyze range "ATs+,AJo+" --vs "QQ+,AKs"
+luca poker analyze hand AhQh --board Kh7d2h5h --potSize 42 --toCall 14
 ```
 
 `luca-poker` requires WASM artifacts and will fail fast if they are missing.
@@ -121,7 +121,7 @@ bun run ../../luca/src/cli/cli.ts poker analyze hand AhQh --board Kh7d2h5h --pot
 Run deterministic simulation from markdown situations:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker sim \
+luca poker sim \
   --situation situations/turned-flush-draw \
   --iterations 5000 \
   --strategy hero=tight-aggressive villain=loose-passive \
@@ -132,12 +132,12 @@ bun run ../../luca/src/cli/cli.ts poker sim \
 
 ## Plan 3 Runtime Notes
 
-For a full local walkthrough (server + seeding + multi-bot run + observability), see [DEMO.md](/Users/jon/@soederpop/playground/luca-poker/DEMO.md).
+For a full local walkthrough (server + seeding + multi-bot run + observability), see [DEMO.md](DEMO.md).
 
 Start server mode with dedicated spectator websocket:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker serve \
+luca poker serve \
   --port 3000 \
   --wsPort 3001 \
   --spectatorPort 3002 \
@@ -150,7 +150,7 @@ bun run ../../luca/src/cli/cli.ts poker serve \
 Join as an agent with optional manual override:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker join ws://localhost:3001 --token <token> --manual
+luca poker join ws://localhost:3001 --token <token> --manual
 ```
 
 Bot credentials are persisted automatically in a managed block inside `.env` at this project root, and still cached in `tmp/poker-cache`.
@@ -158,13 +158,13 @@ Bot credentials are persisted automatically in a managed block inside `.env` at 
 Watch a table from terminal spectator mode:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker watch ws://localhost:3002 --table <tableId>
+luca poker watch ws://localhost:3002 --table <tableId>
 ```
 
 Inspect house runtime health/status from CLI:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker house status --server http://localhost:3000
+luca poker house status --server http://localhost:3000
 ```
 
 House bots are disk-backed actor modules in `house/actors/` (default). Edit those files to tweak showcase bot behavior.
@@ -172,7 +172,7 @@ House bots are disk-backed actor modules in `house/actors/` (default). Edit thos
 Scaffold a new local agent project:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker new-agent my-bot tag
+luca poker new-agent my-bot tag
 ```
 
 This creates `my-bot/` with `README.md`, `container.ts`, `strategy.ts`, and `docs/situations/`.
@@ -180,7 +180,7 @@ This creates `my-bot/` with `README.md`, `container.ts`, `strategy.ts`, and `doc
 Reset leaderboard baseline (with confirmation prompt, local server-side diskCache mutation):
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker leaderboard reset --server http://localhost:3000
+luca poker leaderboard reset --server http://localhost:3000
 ```
 
 Open product surfaces in browser:

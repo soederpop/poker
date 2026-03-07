@@ -22,7 +22,7 @@ React + TypeScript SPA rewrite of the legacy `web/` poker pages.
 
 ## Build
 
-From `playground/luca-poker`:
+From the project root:
 
 ```bash
 bun run web-framework/build.ts
@@ -37,10 +37,10 @@ This writes:
 
 ## Run with Poker Server
 
-From `playground/luca-poker`:
+From the project root:
 
 ```bash
-bun run ../../luca/src/cli/cli.ts poker serve \
+luca poker serve \
   --port 3000 \
   --wsPort 3001 \
   --spectatorPort 3002
