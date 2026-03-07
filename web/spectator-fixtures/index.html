@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Spectator Fixtures</title>
+    <link rel="stylesheet" href="../spectator/spectator.css" />
+    <link rel="stylesheet" href="./spectator-fixtures.css" />
+  </head>
+  <body>
+    <main class="spectator-page">
+      <header class="topbar">
+        <div class="topbar-meta">
+          <div class="brand">Pokurr Fixtures Spectator</div>
+          <div class="status" id="meta">Loading fixtures...</div>
+        </div>
+        <nav class="topbar-nav">
+          <a href="../leaderboard/">Leaderboard</a>
+          <a href="../tournaments/">Tournaments</a>
+          <a href="../spectator/">Live</a>
+          <a href="../spectator-debug/">Debug</a>
+          <a class="active" href="./">Fixtures</a>
+        </nav>
+      </header>
+
+      <section class="spectator-layout">
+        <article class="table-shell">
+          <div class="table-canvas" id="tableCanvas">
+            <div class="felt-overlay"></div>
+            <div class="table-hud">
+              <div class="hud-pill">Fixture <span id="table">-</span></div>
+              <div class="hud-pill">Frame <span id="hand">-</span></div>
+              <div class="hud-pill">Stage <span id="stage">WAITING</span></div>
+              <div class="hud-pill">Pot <span id="pot">0</span></div>
+            </div>
+
+            <div class="board-area">
+              <div class="board-cards" id="board"></div>
+              <div class="pot-chip" id="potChip">
+                <img src="../spectator/assets/red-chip.png" alt="Pot chip" />
+                <span id="potValue">$0</span>
+              </div>
+            </div>
+
+            <img id="dealerButton" class="dealer-button hidden" src="../spectator/assets/dealer-button.png" alt="Dealer" />
+            <div class="seats-layer" id="seats"></div>
+          </div>
+        </article>
+
+        <aside class="event-panel">
+          <h2>Fixture Replay</h2>
+
+          <div class="fixture-controls">
+            <label for="fixtureSelect">Fixture</label>
+            <select id="fixtureSelect"></select>
+
+            <div class="playback-row">
+              <button id="prevBtn" type="button">Prev</button>
+              <button id="playBtn" type="button">Play</button>
+              <button id="nextBtn" type="button">Next</button>
+            </div>
+
+            <label for="speedRange">Speed <span id="speedLabel">1.0x</span></label>
+            <input id="speedRange" type="range" min="0.5" max="4" step="0.5" value="1" />
+
+            <label for="frameRange">Frame <span id="frameLabel">0 / 0</span></label>
+            <input id="frameRange" type="range" min="0" max="0" step="1" value="0" />
+
+            <div class="expected" id="expected"></div>
+          </div>
+
+          <div class="feed" id="feed"></div>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

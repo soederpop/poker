@@ -1,0 +1,240 @@
+:root {
+  --bg: #f6f2e7;
+  --ink: #161412;
+  --muted: #5f574d;
+  --panel: #fffdf8;
+  --line: #d9cfbe;
+  --accent: #0c7c59;
+  --accent-2: #d15b2a;
+  --shadow: 0 14px 40px rgba(20, 12, 6, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(80vw 80vw at 110% -10%, rgba(209, 91, 42, 0.16), transparent 65%),
+    radial-gradient(70vw 70vw at -15% 110%, rgba(12, 124, 89, 0.2), transparent 70%),
+    linear-gradient(180deg, #fef9ef 0%, var(--bg) 100%);
+  min-height: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+.page {
+  width: min(1200px, calc(100vw - 2rem));
+  margin: 1.2rem auto 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.brand {
+  font-family: "Bricolage Grotesque", "Space Grotesk", sans-serif;
+  font-size: clamp(1.3rem, 2.7vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.subtle {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav a {
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.nav a.active {
+  border-color: var(--accent);
+  background: rgba(12, 124, 89, 0.1);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.stat {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  background: #fffcf6;
+}
+
+.stat .label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stat .value {
+  font-weight: 700;
+  font-size: 1.18rem;
+  margin-top: 0.2rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.55rem 0.42rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+th {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.62rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #efe6d6;
+  color: #3f3327;
+}
+
+.pill.running {
+  background: rgba(12, 124, 89, 0.14);
+  color: #04503a;
+}
+
+.pill.starting {
+  background: rgba(209, 91, 42, 0.16);
+  color: #8c3b16;
+}
+
+.feed {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 42vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.event {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  background: #fffcf6;
+  font-size: 0.88rem;
+}
+
+.board {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.card-chip {
+  min-width: 44px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.28rem 0.4rem;
+  background: white;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.seat {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem 0.6rem;
+  background: #fffcf7;
+}
+
+.seat .meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fade-up 260ms ease;
+}
+
+@media (max-width: 900px) {
+  .grid.two,
+  .stats,
+  .seats {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    width: calc(100vw - 1rem);
+  }
+}

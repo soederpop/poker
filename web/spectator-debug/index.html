@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Spectator (Debug)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <div class="brand">Spectator Table (Debug)</div>
+          <div class="subtle" id="meta">Connecting to spectator stream...</div>
+        </div>
+        <nav class="nav">
+          <a href="../leaderboard/">Leaderboard</a>
+          <a href="../tournaments/">Tournaments</a>
+          <a href="../spectator/">Graphics</a>
+          <a class="active" href="./">Debug</a>
+          <a href="../spectator-fixtures/">Fixtures</a>
+        </nav>
+      </header>
+
+      <section class="grid two">
+        <article class="card">
+          <div class="stats" style="margin-bottom:.7rem;">
+            <div class="stat"><div class="label">Table</div><div class="value" id="table">-</div></div>
+            <div class="stat"><div class="label">Hand</div><div class="value" id="hand">-</div></div>
+            <div class="stat"><div class="label">Stage</div><div class="value" id="stage">-</div></div>
+            <div class="stat"><div class="label">Pot</div><div class="value" id="pot">0</div></div>
+          </div>
+          <div class="subtle" style="margin-bottom:.35rem;">Board</div>
+          <div class="board" id="board"></div>
+          <div class="subtle" style="margin:.9rem 0 .35rem;">Seats</div>
+          <div class="seats" id="seats"></div>
+        </article>
+
+        <aside class="card">
+          <h3 style="margin:.1rem 0 .7rem;">Action Feed</h3>
+          <div class="feed" id="feed"></div>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

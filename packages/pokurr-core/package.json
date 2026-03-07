@@ -1,0 +1,22 @@
+{
+  "name": "@pokurr/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "bun test",
+    "benchmark": "bun run scripts/benchmark-equity.ts",
+    "benchmark:suite": "bun run scripts/benchmark-suite.ts"
+  },
+  "dependencies": {
+    "@pokurr/equity": "file:../pokurr-equity",
+    "js-combinatorics": "^0.5.4",
+    "poker-tools": "^1.3.10"
+  },
+  "luca": {
+    "aliases": ["poker core", "core engine", "core"]
+  }
+}

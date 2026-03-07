@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Tournaments</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <div class="brand">Live Tournaments</div>
+          <div class="subtle" id="meta">Loading tournament lobby...</div>
+        </div>
+        <nav class="nav">
+          <a href="../leaderboard/">Leaderboard</a>
+          <a class="active" href="./">Tournaments</a>
+          <a href="../spectator/">Spectator</a>
+          <a href="../spectator-fixtures/">Fixtures</a>
+        </nav>
+      </header>
+
+      <section class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Tournament</th>
+              <th>Buy-In</th>
+              <th>Registered</th>
+              <th>Status</th>
+              <th>Watch</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

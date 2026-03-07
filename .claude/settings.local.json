@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "luca-sandbox",
+    "contentbase"
+  ]
+}

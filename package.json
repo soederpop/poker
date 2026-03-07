@@ -1,0 +1,16 @@
+{
+  "name": "luca-poker",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build:wasm": "bun run --cwd packages/pokurr-equity build",
+    "test": "bun run build:wasm && bun test packages/pokurr-core/test test",
+    "demo:js-api": "bun run ../../luca/src/cli/cli.ts run demos/js-api.md"
+  },
+  "luca": {
+    "aliases": ["luca-poker", "poker", "poker app", "poker playground"]
+  }
+}

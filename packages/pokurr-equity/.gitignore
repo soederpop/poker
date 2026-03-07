@@ -1,0 +1,6 @@
+# Rust build artifacts
+target/
+
+# wasm-pack generated package output
+pkg/
+pkg-node/

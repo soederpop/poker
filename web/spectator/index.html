@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Spectator Table</title>
+    <link rel="stylesheet" href="./spectator.css" />
+  </head>
+  <body>
+    <main class="spectator-page">
+      <header class="topbar">
+        <div class="topbar-meta">
+          <div class="brand">Pokurr Spectator</div>
+          <div class="status" id="meta">Connecting to spectator stream...</div>
+        </div>
+        <nav class="topbar-nav">
+          <a href="../leaderboard/">Leaderboard</a>
+          <a href="../tournaments/">Tournaments</a>
+          <a class="active" href="./">Spectator</a>
+          <a href="../spectator-debug/">Debug</a>
+          <a href="../spectator-fixtures/">Fixtures</a>
+        </nav>
+      </header>
+
+      <section class="spectator-layout">
+        <article class="table-shell">
+          <div class="table-canvas" id="tableCanvas">
+            <div class="felt-overlay"></div>
+            <div class="table-hud">
+              <div class="hud-pill">Table <span id="table">-</span></div>
+              <div class="hud-pill">Hand <span id="hand">-</span></div>
+              <div class="hud-pill">Stage <span id="stage">WAITING</span></div>
+              <div class="hud-pill">Pot <span id="pot">0</span></div>
+            </div>
+
+            <div class="board-area">
+              <div class="board-cards" id="board"></div>
+              <div class="pot-chip" id="potChip">
+                <img src="./assets/red-chip.png" alt="Pot chip" />
+                <span id="potValue">$0</span>
+              </div>
+            </div>
+
+            <img id="dealerButton" class="dealer-button hidden" src="./assets/dealer-button.png" alt="Dealer" />
+            <div class="seats-layer" id="seats"></div>
+          </div>
+        </article>
+
+        <aside class="event-panel">
+          <h2>Action Feed</h2>
+          <div class="feed" id="feed"></div>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

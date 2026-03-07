@@ -1,0 +1,41 @@
+{
+  "name": "@pokurr/equity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./pkg-node/pokurr_equity.js",
+  "module": "./pkg/pokurr_equity.js",
+  "types": "./pkg-node/pokurr_equity.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg-node/pokurr_equity.d.ts",
+      "import": "./pkg-node/pokurr_equity.js",
+      "default": "./pkg-node/pokurr_equity.js"
+    },
+    "./node": {
+      "types": "./pkg-node/pokurr_equity.d.ts",
+      "import": "./pkg-node/pokurr_equity.js",
+      "default": "./pkg-node/pokurr_equity.js"
+    },
+    "./bundler": {
+      "types": "./pkg/pokurr_equity.d.ts",
+      "import": "./pkg/pokurr_equity.js",
+      "default": "./pkg/pokurr_equity.js"
+    }
+  },
+  "files": [
+    "pkg",
+    "pkg-node",
+    "src",
+    "Cargo.toml"
+  ],
+  "scripts": {
+    "build:node": "PATH=\"$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:$PATH\" $HOME/.cargo/bin/wasm-pack build --target nodejs --out-dir pkg-node --out-name pokurr_equity",
+    "build:bundler": "PATH=\"$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:$PATH\" $HOME/.cargo/bin/wasm-pack build --target bundler --out-dir pkg --out-name pokurr_equity",
+    "build": "bun run build:node && bun run build:bundler",
+    "test": "cargo test"
+  },
+  "luca": {
+    "aliases": ["equity", "equity calculator", "hand equity"]
+  }
+}

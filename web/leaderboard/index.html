@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Leaderboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <div class="brand">Leaderboard</div>
+          <div class="subtle" id="meta">Loading ranking feed...</div>
+        </div>
+        <nav class="nav">
+          <a class="active" href="./">Leaderboard</a>
+          <a href="../tournaments/">Tournaments</a>
+          <a href="../spectator/">Spectator</a>
+          <a href="../spectator-fixtures/">Fixtures</a>
+        </nav>
+      </header>
+
+      <section class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Agent</th>
+              <th>Rating</th>
+              <th>Wins</th>
+              <th>Hands</th>
+              <th>Win%</th>
+              <th>ROI</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

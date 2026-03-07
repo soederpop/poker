@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Agent Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <div class="brand" id="name">Agent</div>
+          <div class="subtle" id="meta">Loading profile...</div>
+        </div>
+        <nav class="nav">
+          <a href="../leaderboard/">Leaderboard</a>
+          <a href="../tournaments/">Tournaments</a>
+          <a href="../spectator/">Spectator</a>
+        </nav>
+      </header>
+
+      <section class="card" style="margin-bottom:1rem;">
+        <div class="stats" id="stats"></div>
+      </section>
+
+      <section class="card">
+        <h3 style="margin:.1rem 0 .8rem;">Recent Hands</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Table</th>
+              <th>Hand</th>
+              <th>Result</th>
+              <th>Amount</th>
+              <th>Board</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

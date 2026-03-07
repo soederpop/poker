@@ -1,0 +1,74 @@
+.fixtures-page .fixture-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.fixtures-page .fixture-controls label {
+  font-size: 0.76rem;
+  color: #95aecf;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.fixtures-page .fixture-controls select,
+.fixtures-page .fixture-controls input,
+.fixtures-page .fixture-controls button {
+  width: 100%;
+}
+
+.fixtures-page .fixture-controls select,
+.fixtures-page .fixture-controls input[type="range"] {
+  accent-color: #45d17e;
+}
+
+.fixtures-page .fixture-controls select,
+.fixtures-page .fixture-controls button {
+  border: 1px solid #2e405c;
+  border-radius: 8px;
+  background: rgba(8, 14, 22, 0.72);
+  color: #e6f0ff;
+  padding: 7px 9px;
+  font-size: 0.87rem;
+}
+
+.fixtures-page .fixture-controls button {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.fixtures-page .fixture-controls button:hover {
+  border-color: #44d07c;
+}
+
+.fixtures-page .playback-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.fixtures-page .expected {
+  border: 1px solid #2a3a52;
+  border-radius: 9px;
+  padding: 8px;
+  background: rgba(8, 15, 24, 0.68);
+  color: #c9dcf7;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.fixtures-page .feed {
+  flex-direction: column;
+  height: min(60vh, 620px);
+  border-top: 1px solid #27364d;
+  padding-top: 10px;
+}
+
+.fixtures-page .feed-event {
+  cursor: pointer;
+}
+
+.fixtures-page .feed-event.active {
+  border-color: #45d17e;
+  background: rgba(23, 54, 36, 0.45);
+}

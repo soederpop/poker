@@ -1,0 +1,501 @@
+[
+  {
+    "id": "headsup-preflop-fold-through",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "fold" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 3, "eligible": ["p2"] }],
+      "winners": [{ "playerId": "p2", "amount": 3 }]
+    }
+  },
+  {
+    "id": "headsup-checkdown-showdown-aa-beats-kk",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kc", "Kd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "7h", "9s", "Jc"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 4, "eligible": ["p1", "p2"] }],
+      "winners": [{ "playerId": "p1", "amount": 4 }]
+    }
+  },
+  {
+    "id": "headsup-broadway-chop",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Kd"] },
+        { "playerId": "p2", "cards": ["As", "Kc"] }
+      ]},
+      { "type": "DealBoard", "cards": ["Qh", "Jh", "Th", "2c", "3d"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 4, "eligible": ["p1", "p2"] }],
+      "winners": [
+        { "playerId": "p1", "amount": 2 },
+        { "playerId": "p2", "amount": 2 }
+      ]
+    }
+  },
+  {
+    "id": "threeway-sidepot-main-and-side",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 50 },
+        { "id": "p2", "seat": 2, "stack": 100 },
+        { "id": "p3", "seat": 3, "stack": 200 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kc", "Kd"] },
+        { "playerId": "p3", "cards": ["Qs", "Qd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "4h", "5s", "9c"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "raise", "amount": 40 },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p3", "action": "call" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 150, "eligible": ["p1", "p2", "p3"] },
+        { "amount": 100, "eligible": ["p2", "p3"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 150 },
+        { "playerId": "p2", "amount": 100 }
+      ]
+    }
+  },
+  {
+    "id": "headsup-jam-fold-uncontested",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 20 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "fold" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 22, "eligible": ["p1"] }],
+      "winners": [{ "playerId": "p1", "amount": 22 }]
+    }
+  },
+  {
+    "id": "turn-bet-fold-picks-up-pot",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ac", "Qd"] },
+        { "playerId": "p2", "cards": ["9h", "9s"] }
+      ]},
+      { "type": "PlayerAction", "playerId": "p1", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" },
+      { "type": "AdvanceStreet" },
+      { "type": "DealBoard", "cards": ["2h", "7d", "Tc"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "bet", "amount": 3 },
+      { "type": "PlayerAction", "playerId": "p2", "action": "fold" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 7, "eligible": ["p1"] }],
+      "winners": [{ "playerId": "p1", "amount": 7 }]
+    }
+  },
+  {
+    "id": "headsup-allin-showdown-kk-holds",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 40 },
+        { "id": "p2", "seat": 2, "stack": 40 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Qs"] },
+        { "playerId": "p2", "cards": ["Kc", "Kd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "7d", "9h", "Ts", "3c"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "raise", "amount": 39 },
+      { "type": "PlayerAction", "playerId": "p2", "action": "call" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 80, "eligible": ["p1", "p2"] }],
+      "winners": [{ "playerId": "p2", "amount": 80 }]
+    }
+  },
+  {
+    "id": "threeway-main-pot-chop",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 30 },
+        { "id": "p2", "seat": 2, "stack": 30 },
+        { "id": "p3", "seat": 3, "stack": 30 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Kd"] },
+        { "playerId": "p2", "cards": ["As", "Kc"] },
+        { "playerId": "p3", "cards": ["Qh", "Qd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["Qc", "Jh", "Th", "2d", "3s"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 90, "eligible": ["p1", "p2", "p3"] }],
+      "winners": [
+        { "playerId": "p1", "amount": 45 },
+        { "playerId": "p2", "amount": 45 }
+      ]
+    }
+  },
+  {
+    "id": "threeway-folded-contributor-pot-still-counts",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 },
+        { "id": "p3", "seat": 3, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["2h", "8d"] },
+        { "playerId": "p2", "cards": ["Ah", "Ad"] },
+        { "playerId": "p3", "cards": ["Kc", "Kd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["3c", "7d", "9h", "Ts", "Jc"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "raise", "amount": 8 },
+      { "type": "PlayerAction", "playerId": "p1", "action": "fold" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "call" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 3, "eligible": ["p2", "p3"] },
+        { "amount": 14, "eligible": ["p2", "p3"] }
+      ],
+      "winners": [{ "playerId": "p2", "amount": 17 }]
+    }
+  },
+  {
+    "id": "multistreet-river-check-showdown",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 100 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["9h", "9d"] },
+        { "playerId": "p2", "cards": ["Ah", "Kh"] }
+      ]},
+      { "type": "PlayerAction", "playerId": "p1", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" },
+      { "type": "AdvanceStreet" },
+      { "type": "DealBoard", "cards": ["2c", "7d", "Tc"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "check" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "bet", "amount": 3 },
+      { "type": "PlayerAction", "playerId": "p1", "action": "call" },
+      { "type": "AdvanceStreet" },
+      { "type": "DealBoard", "cards": ["9s"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "bet", "amount": 5 },
+      { "type": "PlayerAction", "playerId": "p2", "action": "call" },
+      { "type": "AdvanceStreet" },
+      { "type": "DealBoard", "cards": ["3h"] },
+      { "type": "PlayerAction", "playerId": "p1", "action": "check" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 20, "eligible": ["p1", "p2"] }],
+      "winners": [{ "playerId": "p1", "amount": 20 }]
+    }
+  },
+  {
+    "id": "threeway-winner-plus-tied-sidepot",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 20 },
+        { "id": "p2", "seat": 2, "stack": 50 },
+        { "id": "p3", "seat": 3, "stack": 50 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kh", "Kd"] },
+        { "playerId": "p3", "cards": ["Ks", "Kc"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "7h", "5s", "9c"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 60, "eligible": ["p1", "p2", "p3"] },
+        { "amount": 60, "eligible": ["p2", "p3"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 60 },
+        { "playerId": "p2", "amount": 30 },
+        { "playerId": "p3", "amount": 30 }
+      ]
+    }
+  },
+  {
+    "id": "fourway-cascading-sidepots",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 10 },
+        { "id": "p2", "seat": 2, "stack": 30 },
+        { "id": "p3", "seat": 3, "stack": 60 },
+        { "id": "p4", "seat": 4, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kh", "Kd"] },
+        { "playerId": "p3", "cards": ["Qh", "Qd"] },
+        { "playerId": "p4", "cards": ["Jh", "Jd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "5h", "7s", "9c"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p4", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 40, "eligible": ["p1", "p2", "p3", "p4"] },
+        { "amount": 60, "eligible": ["p2", "p3", "p4"] },
+        { "amount": 60, "eligible": ["p3", "p4"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 40 },
+        { "playerId": "p2", "amount": 60 },
+        { "playerId": "p3", "amount": 60 }
+      ]
+    }
+  },
+  {
+    "id": "threeway-allin-split-with-odd-chip",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 33 },
+        { "id": "p2", "seat": 2, "stack": 33 },
+        { "id": "p3", "seat": 3, "stack": 33 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Kd"] },
+        { "playerId": "p2", "cards": ["As", "Kc"] },
+        { "playerId": "p3", "cards": ["2h", "3h"] }
+      ]},
+      { "type": "DealBoard", "cards": ["Qc", "Jd", "Th", "Ac", "9s"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" }
+    ],
+    "expected": {
+      "pots": [{ "amount": 99, "eligible": ["p1", "p2", "p3"] }],
+      "winners": [
+        { "playerId": "p1", "amount": 50 },
+        { "playerId": "p2", "amount": 49 }
+      ]
+    }
+  },
+  {
+    "id": "short-stack-cant-cover-sb",
+    "setup": {
+      "smallBlind": 5,
+      "bigBlind": 10,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 3 },
+        { "id": "p2", "seat": 2, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kc", "Kd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "7h", "5s", "9c"] },
+      { "type": "PlayerAction", "playerId": "p2", "action": "check" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 6, "eligible": ["p1", "p2"] },
+        { "amount": 7, "eligible": ["p2"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 6 },
+        { "playerId": "p2", "amount": 7 }
+      ]
+    }
+  },
+  {
+    "id": "headsup-both-short-allin-on-blinds",
+    "setup": {
+      "smallBlind": 5,
+      "bigBlind": 10,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 3 },
+        { "id": "p2", "seat": 2, "stack": 7 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kc", "Kd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "7h", "5s", "9c"] }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 6, "eligible": ["p1", "p2"] },
+        { "amount": 4, "eligible": ["p2"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 6 },
+        { "playerId": "p2", "amount": 4 }
+      ]
+    }
+  },
+  {
+    "id": "fourway-fold-main-winner-side-split",
+    "setup": {
+      "smallBlind": 1,
+      "bigBlind": 2,
+      "ante": 0,
+      "players": [
+        { "id": "p1", "seat": 1, "stack": 20 },
+        { "id": "p2", "seat": 2, "stack": 50 },
+        { "id": "p3", "seat": 3, "stack": 50 },
+        { "id": "p4", "seat": 4, "stack": 100 }
+      ]
+    },
+    "events": [
+      { "type": "PostBlinds", "smallBlindPlayerId": "p1", "bigBlindPlayerId": "p2" },
+      { "type": "DealHoleCards", "cards": [
+        { "playerId": "p1", "cards": ["Ah", "Ad"] },
+        { "playerId": "p2", "cards": ["Kh", "Kd"] },
+        { "playerId": "p3", "cards": ["Ks", "Kc"] },
+        { "playerId": "p4", "cards": ["Qh", "Qd"] }
+      ]},
+      { "type": "DealBoard", "cards": ["2c", "3d", "7h", "5s", "9c"] },
+      { "type": "PlayerAction", "playerId": "p3", "action": "raise", "amount": 20 },
+      { "type": "PlayerAction", "playerId": "p4", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p1", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p2", "action": "all-in" },
+      { "type": "PlayerAction", "playerId": "p3", "action": "call" },
+      { "type": "PlayerAction", "playerId": "p4", "action": "fold" }
+    ],
+    "expected": {
+      "pots": [
+        { "amount": 80, "eligible": ["p1", "p2", "p3"] },
+        { "amount": 60, "eligible": ["p2", "p3"] }
+      ],
+      "winners": [
+        { "playerId": "p1", "amount": 80 },
+        { "playerId": "p2", "amount": 30 },
+        { "playerId": "p3", "amount": 30 }
+      ]
+    }
+  }
+]

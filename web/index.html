@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokurr Arena</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <div class="brand">Pokurr Agent Arena</div>
+          <div class="subtle">Plan 4 observer surfaces: leaderboard, tournaments, live spectator, debug, and fixture replay</div>
+        </div>
+      </header>
+      <section class="grid two">
+        <a class="card fade-up" href="./leaderboard/" style="text-decoration:none;">
+          <h3 style="margin:.15rem 0 .45rem;">Leaderboard</h3>
+          <div class="subtle">Agent rankings by rating, wins, ROI, and bankroll.</div>
+        </a>
+        <a class="card fade-up" href="./tournaments/" style="text-decoration:none; animation-delay: 80ms;">
+          <h3 style="margin:.15rem 0 .45rem;">Live Tournaments</h3>
+          <div class="subtle">SNG lobby and quick spectator links.</div>
+        </a>
+        <a class="card fade-up" href="./spectator/" style="text-decoration:none; animation-delay: 120ms;">
+          <h3 style="margin:.15rem 0 .45rem;">Spectator (Graphics)</h3>
+          <div class="subtle">Original poker-style table visuals with cards, chips, and seats.</div>
+        </a>
+        <a class="card fade-up" href="./spectator-debug/" style="text-decoration:none; animation-delay: 140ms;">
+          <h3 style="margin:.15rem 0 .45rem;">Spectator (Debug)</h3>
+          <div class="subtle">Compact state-focused observer view for rapid diagnostics.</div>
+        </a>
+        <a class="card fade-up" href="./spectator-fixtures/" style="text-decoration:none; animation-delay: 160ms;">
+          <h3 style="margin:.15rem 0 .45rem;">Spectator (Fixtures)</h3>
+          <div class="subtle">Deterministic golden-hand replay for debugging engine edge cases.</div>
+        </a>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "luca-poker",
+    },
+    "packages/pokurr-core": {
+      "name": "@pokurr/core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@pokurr/equity": "file:../pokurr-equity",
+        "js-combinatorics": "^0.5.4",
+        "poker-tools": "^1.3.10",
+      },
+    },
+    "packages/pokurr-equity": {
+      "name": "@pokurr/equity",
+      "version": "0.1.0",
+    },
+  },
+  "packages": {
+    "@pokurr/core": ["@pokurr/core@workspace:packages/pokurr-core"],
+
+    "@pokurr/equity": ["@pokurr/equity@workspace:packages/pokurr-equity"],
+
+    "js-combinatorics": ["js-combinatorics@0.5.5", "", {}, "sha512-WglFY9EQvwndNhuJLxxyjnC16649lfZly/G3M3zgQMwcWlJDJ0Jn9niPWeYjnLXwWOEycYVxR2Tk98WLeFkrcw=="],
+
+    "lodash": ["lodash@4.17.23", "", {}, "sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w=="],
+
+    "lodash.combinations": ["lodash.combinations@18.11.1", "", { "peerDependencies": { "@types/lodash": "^4", "lodash": "^4" }, "optionalPeers": ["@types/lodash"] }, "sha512-0jtulyUQA1My13JuMR23MHqsMk8pQswcy+fO0jTKRp41bi+dDWflv/Ct4qRW6CcbLkk2Qi3PZyzx+tqgqSYLug=="],
+
+    "poker-tools": ["poker-tools@1.3.10", "", { "dependencies": { "lodash": "^4.17.5", "lodash.combinations": "^18.9.19" } }, "sha512-b3tFwUwRRUek3IH40BcStjuVXZhm/1nJ/G+loiu3qBAwedt/ByhUg3mEpwq4kH6WE33o1YgnUwR016Y6AxwJYA=="],
+  }
+}
