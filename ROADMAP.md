@@ -1,0 +1,3 @@
+- Docs / Guides on setting up your own local tournament server, writing bots
+- Guide / Examples of using this as a poker journal / situation analysis tool
+- A regret minimizer implementation

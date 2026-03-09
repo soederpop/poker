@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "luca-sandbox": {
+      "command": "luca",
+      "args": ["sandbox-mcp"],
+      "cwd": "/Users/jon/@soederpop/poker"
+    },
+    "contentbase": {
+      "command": "cnotes",
+      "args": ["mcp"],
+      "cwd": "/Users/jon/@soederpop/poker"
+    }
+  }
+}
