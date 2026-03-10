@@ -73,11 +73,11 @@ export const argsSchema = CommandOptionsSchema.extend({
 
 type PokerOptions = z.infer<typeof argsSchema>
 
-const SUIT_STYLES: Record<string, { symbol: string; emoji: string; color: "redBright" | "blueBright" | "gray" }> = {
-  h: { symbol: "♥", emoji: "♥️", color: "redBright" },
-  d: { symbol: "♦", emoji: "♦️", color: "redBright" },
-  s: { symbol: "♠", emoji: "♠️", color: "blueBright" },
-  c: { symbol: "♣", emoji: "♣️", color: "gray" },
+const SUIT_STYLES: Record<string, { symbol: string; color: "redBright" | "blueBright" | "white" | "green" }> = {
+  h: { symbol: "♥", color: "redBright" },
+  d: { symbol: "♦", color: "redBright" },
+  s: { symbol: "♠", color: "white" },
+  c: { symbol: "♣", color: "green" },
 }
 
 function prettyCard(card: string, colors: any): string {
@@ -90,20 +90,44 @@ function prettyCard(card: string, colors: any): string {
   }
 
   const painter = colors[style.color] || ((value: string) => value)
-  return painter(`${rank}${style.emoji}`)
+  return painter(`[${rank}${style.symbol}]`)
 }
 
 function prettyCards(cards: string[], colors: any): string {
   if (cards.length === 0) {
-    return colors.gray("(none)")
+    return colors.gray("---")
   }
   return cards.map((card) => prettyCard(card, colors)).join(" ")
 }
 
 function printSection(container: AGIContainer & any, title: string) {
   const ui = container.feature("ui")
+  const line = "─".repeat(40)
   console.log("")
-  console.log(ui.colors.bold.cyan(`🂡 ${title}`))
+  console.log(ui.colors.dim(line))
+  console.log(ui.colors.bold.cyan(`♠ ${title}`))
+  console.log(ui.colors.dim(line))
+}
+
+function printKV(ui: any, label: string, value: string, labelWidth = 16) {
+  console.log(`  ${ui.colors.dim(label.padEnd(labelWidth))} ${value}`)
+}
+
+function printBanner(container: AGIContainer & any) {
+  const ui = container.feature("ui")
+  const c = ui.colors
+  try {
+    const art = ui.asciiArt("POKURR", "Small") as string
+    const lines = art.split("\n")
+    const palette = [c.redBright, c.red, c.white, c.cyanBright, c.blueBright]
+    const colored = lines.map((line: string, i: number) => palette[i % palette.length](line)).join("\n")
+    console.log(colored)
+  } catch {
+    console.log(c.bold.red("♠") + c.bold.white(" P O K U R R ") + c.bold.red("♠"))
+    console.log("")
+  }
+  console.log(c.dim("  Poker AI Agent Arena"))
+  console.log("")
 }
 
 function normalizeStrategyAssignments(value: PokerOptions["strategy"]): Record<string, string> {
@@ -133,21 +157,37 @@ function parsePosition(value?: string): PokerPosition {
   return "BTN"
 }
 
-function printUsage(standalone = false) {
+function printUsage(container: AGIContainer & any, standalone = false) {
+  const ui = container.feature("ui")
+  const c = ui.colors
   const cmd = standalone ? "pokurr" : "luca poker"
-  console.log("Usage:")
-  console.log(`  ${cmd} analyze equity AhKd QsQc [--board Kh7d2h]`)
-  console.log(`  ${cmd} analyze range "ATs+,AJo+" --vs "QQ+,AKs" [--board Kh7d2h]`)
-  console.log(`  ${cmd} analyze hand AhKd --board Kh7d2h5s [--potSize 30 --toCall 10]`)
-  console.log(`  ${cmd} sim --situation situations/turned-flush-draw --iterations 1000 --strategy hero=tight-aggressive villain=loose-passive --seed 42`)
-  console.log(`  ${cmd} serve --port 3000 [--anyPort true] [--force true] --seedLobby true --botThinkDelayMinMs 1200 --botThinkDelayMaxMs 2600`)
-  console.log(`  ${cmd} seed [http://localhost:3000] [--seedCount 4] [--seedPrefix seed-bot]`)
-  console.log(`  ${cmd} new-agent my-bot [tag]`)
-  console.log(`  ${cmd} register http://localhost:3000 --name my-bot`)
-  console.log(`  ${cmd} join ws://localhost:3001 --token <token> [--manual]`)
-  console.log(`  ${cmd} watch ws://localhost:3002 [--table <tableId>]`)
-  console.log(`  ${cmd} house status [http://localhost:3000] [--server http://localhost:3000]`)
-  console.log(`  ${cmd} leaderboard reset [http://localhost:3000] [--server http://localhost:3000] [--force]`)
+
+  printBanner(container)
+
+  const group = (label: string) => console.log(c.bold.yellow(`\n  ${label}`))
+  const usage = (sub: string, desc: string) => console.log(`    ${c.cyan(cmd + " " + sub)}  ${c.dim(desc)}`)
+
+  group("♦ Analysis")
+  usage("analyze equity AhKd QsQc [--board Kh7d2h]", "Compare two exact hands")
+  usage('analyze range "ATs+,AJo+" --vs "QQ+,AKs"', "Compare hand ranges")
+  usage("analyze hand AhKd --board Kh7d2h5s", "Evaluate a specific hand")
+
+  group("♣ Simulation")
+  usage("sim --situation <id> --iterations 1000", "Monte Carlo simulation")
+
+  group("♠ Server")
+  usage("serve --port 3000 [--seedLobby true]", "Start the game server")
+  usage("seed [http://localhost:3000]", "Register house bots")
+  usage("house status [http://localhost:3000]", "Server health & status")
+  usage("leaderboard reset [--force]", "Reset leaderboard baseline")
+
+  group("♥ Play")
+  usage("new-agent my-bot [tag]", "Scaffold a new agent project")
+  usage("register http://localhost:3000 --name my-bot", "Register a bot")
+  usage("join ws://localhost:3001 --token <token>", "Connect bot to table")
+  usage("watch ws://localhost:3002 [--table <id>]", "Spectate a table")
+
+  console.log("")
 }
 
 function normalizeAgentSlug(rawInput: string): string {
@@ -340,10 +380,14 @@ async function runNewAgent(container: AGIContainer & any, options: PokerOptions,
   )
 
   printSection(container, "New Agent Scaffold")
-  console.log(`Created: ${ui.colors.cyan(rootDir)}`)
-  console.log(`Agent: ${ui.colors.bold(displayName)} (${slug})`)
-  console.log(`Template: ${actorTemplate ? ui.colors.green(actorTemplate) : ui.colors.gray("tag")}`)
-  console.log(ui.colors.gray("Files: README.md, container.ts, strategy.ts, docs/situations/README.md"))
+  printKV(ui, "Directory", ui.colors.cyan(rootDir))
+  printKV(ui, "Agent", `${ui.colors.bold(displayName)} ${ui.colors.dim(`(${slug})`)}`)
+  printKV(ui, "Template", actorTemplate ? ui.colors.green(actorTemplate) : ui.colors.dim("tag"))
+  console.log("")
+  console.log(ui.colors.dim("  Files created:"))
+  for (const f of ["README.md", "container.ts", "strategy.ts", "docs/situations/README.md"]) {
+    console.log(ui.colors.dim(`    ♦ ${f}`))
+  }
 }
 
 async function runAnalyze(container: AGIContainer & any, options: PokerOptions, args: string[]) {
@@ -370,10 +414,10 @@ async function runAnalyze(container: AGIContainer & any, options: PokerOptions, 
 
     const ui = container.feature("ui")
     printSection(container, "Equity Analysis")
-    console.log(ui.colors.gray(`Backend: ${backend}`))
-    console.log(`Hero (${prettyCards(hero, ui.colors)}): ${ui.colors.green(`${heroPct}%`)}`)
-    console.log(`Villain (${prettyCards(villain, ui.colors)}): ${ui.colors.yellow(`${villainPct}%`)}`)
-    console.log(`Split/Tie: ${ui.colors.magenta(`${tiePct}%`)}`)
+    printKV(ui, "Backend", ui.colors.dim(backend))
+    printKV(ui, "Hero", `${prettyCards(hero, ui.colors)}  ${ui.colors.green.bold(`${heroPct}%`)}`)
+    printKV(ui, "Villain", `${prettyCards(villain, ui.colors)}  ${ui.colors.yellow.bold(`${villainPct}%`)}`)
+    printKV(ui, "Split/Tie", ui.colors.magenta(`${tiePct}%`))
     return
   }
 
@@ -392,10 +436,10 @@ async function runAnalyze(container: AGIContainer & any, options: PokerOptions, 
 
     const ui = container.feature("ui")
     printSection(container, "Range Analysis")
-    console.log(ui.colors.gray(`Backend: ${backend}`))
-    console.log(`Us (${ui.colors.white(result.us)}): ${ui.colors.green(`${result.ours}%`)}`)
-    console.log(`Them (${ui.colors.white(result.them)}): ${ui.colors.yellow(`${result.theirs}%`)}`)
-    console.log(`Split/Tie: ${ui.colors.magenta(`${result.tie}%`)}`)
+    printKV(ui, "Backend", ui.colors.dim(backend))
+    printKV(ui, "Us", `${ui.colors.white(result.us)}  ${ui.colors.green.bold(`${result.ours}%`)}`)
+    printKV(ui, "Them", `${ui.colors.white(result.them)}  ${ui.colors.yellow.bold(`${result.theirs}%`)}`)
+    printKV(ui, "Split/Tie", ui.colors.magenta(`${result.tie}%`))
     return
   }
 
@@ -411,9 +455,10 @@ async function runAnalyze(container: AGIContainer & any, options: PokerOptions, 
 
     const ui = container.feature("ui")
     printSection(container, "Hand Analysis")
-    console.log(ui.colors.gray(`Backend: ${backend}`))
-    console.log(`Hand: ${prettyCards(hero, ui.colors)} | Board: ${prettyCards(board, ui.colors)}`)
-    console.log(`Rank: ${ui.colors.bold(rank.label)}`)
+    printKV(ui, "Backend", ui.colors.dim(backend))
+    printKV(ui, "Hand", prettyCards(hero, ui.colors))
+    printKV(ui, "Board", prettyCards(board, ui.colors))
+    printKV(ui, "Rank", ui.colors.bold.yellow(rank.label))
 
     if (Number.isFinite(options.potSize) && Number.isFinite(options.toCall)) {
       const opponentRange = options.vs || "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+"
@@ -432,10 +477,10 @@ async function runAnalyze(container: AGIContainer & any, options: PokerOptions, 
       const heroEq = equityVsRange.ours
       const recommendation = heroEq >= potOdds * 100 ? "continue (call/raise mix)" : "fold"
 
-      console.log(`Equity vs range: ${ui.colors.green(`${heroEq.toFixed(2)}%`)}`)
-      console.log(`Pot odds threshold: ${ui.colors.yellow(`${threshold}%`)}`)
-      const recommendationColor = recommendation.startsWith("continue") ? ui.colors.green : ui.colors.red
-      console.log(`Recommendation: ${recommendationColor(recommendation)}`)
+      printKV(ui, "Equity vs range", ui.colors.green.bold(`${heroEq.toFixed(2)}%`))
+      printKV(ui, "Pot odds thresh", ui.colors.yellow(`${threshold}%`))
+      const recommendationColor = recommendation.startsWith("continue") ? ui.colors.green.bold : ui.colors.red.bold
+      printKV(ui, "Recommendation", recommendationColor(recommendation))
     }
 
     return
@@ -633,16 +678,23 @@ async function runSimulation(container: AGIContainer & any, options: PokerOption
 
   const ui = container.feature("ui")
   printSection(container, "Simulation Results")
-  console.log(ui.colors.gray(`Situation: ${result.situation}`))
-  console.log(ui.colors.gray(`Seed: ${seed} | Backend: wasm | Iterations: ${options.iterations}`))
-  console.log(`Hero strategy: ${ui.colors.cyan(heroProfile)} | Villain strategy: ${ui.colors.cyan(villainProfile)}`)
-  console.log(`Hero win rate: ${ui.colors.green(`${result.winRates.hero}%`)}`)
-  console.log(`Villain win rate: ${ui.colors.yellow(`${result.winRates.villain}%`)}`)
-  console.log(`Tie rate: ${ui.colors.magenta(`${result.winRates.tie}%`)}`)
-  console.log(`Average pot: ${ui.colors.bold(`${result.averagePot}`)}`)
-  console.log(`EV/hand hero: ${ui.colors.green(`${result.evPerSeat.hero}`)}`)
-  console.log(`EV/hand villain: ${ui.colors.yellow(`${result.evPerSeat.villain}`)}`)
-  console.log(ui.colors.gray(`Saved to diskCache key: ${cacheKey}`))
+  printKV(ui, "Situation", ui.colors.white(result.situation))
+  printKV(ui, "Seed", ui.colors.dim(`${seed}`))
+  printKV(ui, "Iterations", ui.colors.white(`${options.iterations}`))
+  printKV(ui, "Hero strat", ui.colors.cyan(heroProfile))
+  printKV(ui, "Villain strat", ui.colors.cyan(villainProfile))
+  console.log("")
+  console.log(ui.colors.dim("  ── Win Rates ──────────────────────"))
+  printKV(ui, "Hero", ui.colors.green.bold(`${result.winRates.hero}%`))
+  printKV(ui, "Villain", ui.colors.yellow.bold(`${result.winRates.villain}%`))
+  printKV(ui, "Tie", ui.colors.magenta(`${result.winRates.tie}%`))
+  console.log("")
+  console.log(ui.colors.dim("  ── EV & Pot ───────────────────────"))
+  printKV(ui, "Avg pot", ui.colors.bold(`${result.averagePot}`))
+  printKV(ui, "EV/hand hero", ui.colors.green(`${result.evPerSeat.hero}`))
+  printKV(ui, "EV/hand villain", ui.colors.yellow(`${result.evPerSeat.villain}`))
+  console.log("")
+  console.log(ui.colors.dim(`  Saved → ${cacheKey}`))
 
 }
 
@@ -1187,7 +1239,7 @@ async function runServe(container: AGIContainer & any, options: PokerOptions) {
         return
       }
       done = true
-      console.log(`[poker-server] ${signal} received, finishing active hands and shutting down...`)
+      console.log(`\n  ♠ ${signal} received — finishing active hands...`)
       await Promise.race([
         runtime.stop(),
         new Promise((resolve) => setTimeout(resolve, 7000)),
@@ -1212,15 +1264,15 @@ async function runRegister(container: AGIContainer & any, options: PokerOptions,
 
   const ui = container.feature("ui")
   printSection(container, "Bot Registration")
-  console.log(`Server: ${ui.colors.cyan(serverBaseUrl)}`)
-  console.log(`Bot: ${ui.colors.bold(String(result.botId || "unknown"))} (${name})`)
-  console.log(`Token: ${ui.colors.green(String(result.token || ""))}`)
-  console.log(`Refresh: ${ui.colors.gray(String(result.refreshToken || ""))}`)
-  console.log(`WS URL: ${ui.colors.yellow(String(result.wsUrl || ""))}`)
+  printKV(ui, "Server", ui.colors.cyan(serverBaseUrl))
+  printKV(ui, "Bot", `${ui.colors.bold(String(result.botId || "unknown"))} ${ui.colors.dim(`(${name})`)}`)
+  printKV(ui, "Token", ui.colors.green(String(result.token || "")))
+  printKV(ui, "Refresh", ui.colors.dim(String(result.refreshToken || "")))
+  printKV(ui, "WS URL", ui.colors.yellow(String(result.wsUrl || "")))
   if (result.spectatorWsUrl) {
-    console.log(`Spectator WS: ${ui.colors.cyan(String(result.spectatorWsUrl))}`)
+    printKV(ui, "Spectator WS", ui.colors.cyan(String(result.spectatorWsUrl)))
   }
-  console.log(ui.colors.gray("Saved token to diskCache (poker:client:auth:latest) and .env bot block."))
+  console.log(ui.colors.dim("\n  Saved to diskCache + .env bot block."))
 }
 
 function normalizeSeedPrefix(raw: string): string {
@@ -1271,9 +1323,10 @@ async function runSeed(container: AGIContainer & any, options: PokerOptions, arg
   }> = []
 
   printSection(container, "Bot Seeding")
-  console.log(`Server: ${ui.colors.cyan(serverBaseUrl)}`)
-  console.log(`Count: ${ui.colors.bold(String(count))}`)
-  console.log(`Prefix: ${ui.colors.gray(prefix)}`)
+  printKV(ui, "Server", ui.colors.cyan(serverBaseUrl))
+  printKV(ui, "Count", ui.colors.bold(String(count)))
+  printKV(ui, "Prefix", ui.colors.dim(prefix))
+  console.log("")
 
   for (let i = 0; i < count; i += 1) {
     const name = `${prefix}-${String(i + 1).padStart(2, "0")}`
@@ -1293,7 +1346,7 @@ async function runSeed(container: AGIContainer & any, options: PokerOptions, arg
       serverId,
     })
 
-    console.log(`${ui.colors.green(`+ ${name}`)} ${ui.colors.gray(botId)}`)
+    console.log(`  ${ui.colors.green("♣")} ${ui.colors.white(name)} ${ui.colors.dim(botId)}`)
   }
 
   const last = created[created.length - 1]
@@ -1310,11 +1363,10 @@ async function runSeed(container: AGIContainer & any, options: PokerOptions, arg
     })
   }
 
-  console.log("")
-  console.log(ui.colors.bold("Seed Summary"))
-  console.log(`Created: ${created.length}`)
-  console.log(`Active bot in .env: ${ui.colors.gray(String(last?.botId || "(none)"))}`)
-  console.log(ui.colors.gray("Credentials saved into .env managed bot block."))
+  console.log(ui.colors.dim("\n  ── Summary ────────────────────────"))
+  printKV(ui, "Created", ui.colors.bold(`${created.length}`))
+  printKV(ui, "Active bot", ui.colors.dim(String(last?.botId || "(none)")))
+  console.log(ui.colors.dim("\n  Credentials saved to .env bot block."))
 }
 
 async function runJoin(container: AGIContainer & any, options: PokerOptions, args: string[]) {
@@ -1395,12 +1447,12 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
 
   client.onMessage((message) => {
     if (message.type === "error") {
-      console.log(ui.colors.red(`[error] ${String(message.payload?.message || "unknown")}`))
+      console.log(ui.colors.red(`  ✗ ${String(message.payload?.message || "unknown")}`))
       return
     }
 
     if (message.type === "chat") {
-      console.log(ui.colors.gray(`[chat] ${String(message.payload?.from || "table")}: ${String(message.payload?.message || "")}`))
+      console.log(ui.colors.dim(`  💬 ${String(message.payload?.from || "table")}: ${String(message.payload?.message || "")}`))
       return
     }
 
@@ -1408,13 +1460,13 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       const actor = String(message.payload?.playerName || message.payload?.seat || "player")
       const action = String(message.payload?.action || "")
       const amount = message.payload?.amount !== undefined ? ` ${String(message.payload.amount)}` : ""
-      console.log(ui.colors.yellow(`[action] ${actor}: ${action}${amount}`))
+      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`))
       return
     }
 
     if (message.type === "wallet_state") {
       const balance = String(message.payload?.balance ?? "")
-      console.log(ui.colors.green(`[wallet] balance=${balance}`))
+      console.log(ui.colors.green(`  💰 balance=${balance}`))
       return
     }
 
@@ -1422,7 +1474,7 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       const remaining = Number(message.payload?.timeBankRemaining ?? message.payload?.remaining ?? liveState.timeBankRemaining ?? 0)
       liveState.timeBankRemaining = Number.isFinite(remaining) ? remaining : liveState.timeBankRemaining
       const reason = String(message.payload?.reason || "update")
-      console.log(ui.colors.gray(`[timebank] ${reason} remaining=${liveState.timeBankRemaining}s`))
+      console.log(ui.colors.dim(`  ⏱ ${reason} remaining=${liveState.timeBankRemaining}s`))
       return
     }
 
@@ -1440,7 +1492,7 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       liveState.board = []
       liveState.position = parsePosition(String(message.payload?.position || "BTN"))
       stats.hands += 1
-      console.log(ui.colors.cyan(`[hand] #${stats.hands} cards=${prettyCards(liveState.heroCards, ui.colors)}`))
+      console.log(ui.colors.cyan(`\n  ♠ Hand #${stats.hands}`) + `  ${prettyCards(liveState.heroCards, ui.colors)}`)
       return
     }
 
@@ -1470,8 +1522,8 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       if (heroWon) {
         stats.wins += 1
       }
-      const outcome = heroWon ? ui.colors.green("won") : ui.colors.gray("lost")
-      console.log(`${ui.colors.cyan("[result]")} ${outcome} pot=${pot}`)
+      const outcome = heroWon ? ui.colors.green.bold("WIN") : ui.colors.dim("loss")
+      console.log(`  ${outcome}  pot=${ui.colors.bold(`${pot}`)}`)
       return
     }
 
@@ -1556,9 +1608,9 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
           })
 
           const amountText = selectedDecision.amount !== undefined ? ` ${selectedDecision.amount}` : ""
-          console.log(ui.colors.magenta(`[you] ${selectedDecision.action}${amountText}`))
+          console.log(ui.colors.magenta(`  ♥ YOU: ${selectedDecision.action}${amountText}`))
         } catch (error: any) {
-          console.log(ui.colors.red(`[decide-error] ${String(error?.message || error)}`))
+          console.log(ui.colors.red(`  ✗ decide: ${String(error?.message || error)}`))
         } finally {
           deciding = false
         }
@@ -1571,8 +1623,9 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
   stats.botId = String(auth.payload?.botId || "")
 
   printSection(container, "Agent Join")
-  console.log(`Connected: ${ui.colors.cyan(wsUrl)}`)
-  console.log(ui.colors.gray(`Authenticated as ${stats.botId || "bot"}. Strategy: ${preferredProfile}`))
+  printKV(ui, "Connected", ui.colors.cyan(wsUrl))
+  printKV(ui, "Bot ID", ui.colors.bold(stats.botId || "bot"))
+  printKV(ui, "Strategy", ui.colors.cyan(preferredProfile))
   if (options.manual && !manualEnabled) {
     console.log(ui.colors.yellow("Manual mode requested, but stdin is not interactive. Falling back to bot decisions."))
   } else if (manualEnabled) {
@@ -1590,8 +1643,8 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
   if (chosen && chosen.id) {
     const joined = await client.joinTable(String(chosen.id))
     const joinedPayload = joined.payload && typeof joined.payload === "object" ? joined.payload : {}
-    console.log(`Joined table: ${ui.colors.bold(String(joinedPayload.tableId || chosen.id))}`)
-    console.log(`Seat: ${ui.colors.cyan(String(joinedPayload.seat || "?"))}`)
+    printKV(ui, "Table", ui.colors.bold(String(joinedPayload.tableId || chosen.id)))
+    printKV(ui, "Seat", ui.colors.cyan(String(joinedPayload.seat || "?")))
   } else {
     console.log(ui.colors.yellow("No available table to join yet."))
   }
@@ -1607,9 +1660,14 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
         return
       }
       done = true
-      console.log(ui.colors.gray(`\\n${signal} received. Disconnecting...`))
+      console.log(ui.colors.dim(`\n${signal} received. Disconnecting...`))
       await client.disconnect()
-      console.log(ui.colors.cyan(`Hands: ${stats.hands} | Wins: ${stats.wins} | Actions: ${stats.actions} | Biggest pot: ${stats.biggestPot}`))
+      console.log("")
+      console.log(ui.colors.dim("  ── Session Stats ──────────────────"))
+      printKV(ui, "Hands", `${stats.hands}`)
+      printKV(ui, "Wins", ui.colors.green(`${stats.wins}`))
+      printKV(ui, "Actions", `${stats.actions}`)
+      printKV(ui, "Biggest pot", ui.colors.bold(`${stats.biggestPot}`))
       resolve()
     }
 
@@ -1640,29 +1698,44 @@ async function runWatch(container: AGIContainer & any, options: PokerOptions, ar
     if (!live.tableId) {
       return
     }
+    const c = ui.colors
+    const stageColors: Record<string, any> = {
+      preflop: c.white, flop: c.cyan, turn: c.yellow, river: c.redBright, showdown: c.green,
+    }
+    const stagePaint = stageColors[live.stage] || c.white
+    const boardText = live.board.length ? prettyCards(live.board, c) : c.dim("---")
+    const topLine = `┌${"─".repeat(48)}┐`
+    const botLine = `└${"─".repeat(48)}┘`
+
     console.log("")
-    console.log(ui.colors.bold.cyan(`Table ${live.tableId} | Hand ${live.handNumber} | ${String(live.stage).toUpperCase()} | Pot ${live.pot}`))
-    const boardText = live.board.length ? live.board.join(" ") : "(no board)"
-    console.log(ui.colors.gray(`Board: ${boardText}`))
+    console.log(c.dim(topLine))
+    console.log(c.dim("│ ") + c.bold(`♠ Table ${live.tableId}`) + c.dim(" │ ") + `Hand ${c.bold(`#${live.handNumber}`)}` + c.dim(" │ ") + stagePaint(String(live.stage).toUpperCase()) + c.dim(" │ ") + c.green.bold(`Pot ${live.pot}`))
+    console.log(c.dim("│ ") + `Board: ${boardText}`)
+    console.log(c.dim("├" + "─".repeat(48) + "┤"))
+
     const players = [...live.players].sort((left, right) => left.seat - right.seat)
     for (const player of players) {
+      const seatStr = c.dim(String(player.seat).padStart(2, " ") + ".")
+      const nameStr = player.name.padEnd(16, " ")
+      const stackStr = c.green(String(player.stack).padStart(6, " "))
       const flags = [
-        player.inHand === false ? "out" : "",
-        player.folded ? "folded" : "",
-        player.allIn ? "all-in" : "",
-      ].filter(Boolean).join(", ")
-      console.log(`${String(player.seat).padStart(2, " ")}. ${player.name.padEnd(18, " ")} stack=${String(player.stack).padStart(5, " ")}${flags ? ` (${flags})` : ""}`)
+        player.inHand === false ? c.red("OUT") : "",
+        player.folded ? c.dim("FOLD") : "",
+        player.allIn ? c.yellow.bold("ALL-IN") : "",
+      ].filter(Boolean).join(" ")
+      console.log(c.dim("│ ") + `${seatStr} ${nameStr} ${stackStr}  ${flags}`)
     }
+    console.log(c.dim(botLine))
   }
 
   client.onMessage((message) => {
     if (message.type === "error") {
-      console.log(ui.colors.red(`[error] ${String(message.payload?.message || "unknown")}`))
+      console.log(ui.colors.red(`  ✗ ${String(message.payload?.message || "unknown")}`))
       return
     }
 
     if (message.type === "chat") {
-      console.log(ui.colors.gray(`[chat] ${String(message.payload?.from || "table")}: ${String(message.payload?.message || "")}`))
+      console.log(ui.colors.dim(`  💬 ${String(message.payload?.from || "table")}: ${String(message.payload?.message || "")}`))
       return
     }
 
@@ -1692,16 +1765,16 @@ async function runWatch(container: AGIContainer & any, options: PokerOptions, ar
       const actor = String(message.payload?.playerName || message.payload?.seat || "player")
       const action = String(message.payload?.action || "")
       const amount = message.payload?.amount !== undefined ? ` ${String(message.payload.amount)}` : ""
-      console.log(ui.colors.yellow(`[action] ${actor}: ${action}${amount}`))
+      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`))
       return
     }
 
     if (message.type === "hand_result") {
       const winners = Array.isArray(message.payload?.winners) ? message.payload!.winners as Array<any> : []
       const summary = winners
-        .map((winner) => `${String(winner.playerId || "")} +${String(winner.amount || 0)}`)
+        .map((winner: any) => `${String(winner.playerId || "")} +${String(winner.amount || 0)}`)
         .join(", ")
-      console.log(ui.colors.green(`[result] pot=${String(message.payload?.pot || 0)} winners=${summary || "none"}`))
+      console.log(ui.colors.green.bold(`  🏆 pot=${String(message.payload?.pot || 0)} → ${summary || "none"}`))
       return
     }
   })
@@ -1725,9 +1798,9 @@ async function runWatch(container: AGIContainer & any, options: PokerOptions, ar
   await client.waitFor("spectator_joined", 10_000)
 
   printSection(container, "Spectator Watch")
-  console.log(`Connected: ${ui.colors.cyan(wsUrl)}`)
-  console.log(`Watching table: ${ui.colors.bold(String(chosen.id))}`)
-  console.log(ui.colors.gray("Listening for spectator events. Press Ctrl+C to exit."))
+  printKV(ui, "Connected", ui.colors.cyan(wsUrl))
+  printKV(ui, "Table", ui.colors.bold(String(chosen.id)))
+  console.log(ui.colors.dim("  Listening for events. Press Ctrl+C to exit."))
 
   await new Promise<void>((resolve) => {
     let done = false
@@ -1737,7 +1810,7 @@ async function runWatch(container: AGIContainer & any, options: PokerOptions, ar
         return
       }
       done = true
-      console.log(ui.colors.gray(`\\n${signal} received. Disconnecting spectator...`))
+      console.log(ui.colors.dim(`\n${signal} received. Disconnecting spectator...`))
       await client.disconnect()
       resolve()
     }
@@ -1764,36 +1837,51 @@ async function runHouseStatus(container: AGIContainer & any, options: PokerOptio
   const houseBots = payload?.houseBots && typeof payload.houseBots === "object" ? payload.houseBots : {}
   const connections = payload?.connections && typeof payload.connections === "object" ? payload.connections : {}
 
+  const c = ui.colors
   printSection(container, "House Status")
-  console.log(`Server: ${ui.colors.cyan(serverBaseUrl)}`)
-  console.log(`Status: ${String(payload?.status || "unknown") === "up" ? ui.colors.green("up") : ui.colors.red(String(payload?.status || "down"))}`)
-  console.log(`Ready: ${payload?.ready ? ui.colors.green("yes") : ui.colors.yellow("no")}`)
-  console.log(`Uptime: ${ui.colors.gray(`${Number(payload?.uptimeMs || 0)} ms`)}`)
-  console.log(`HTTP: ${ui.colors.gray(String(endpoints.http || ""))}`)
-  console.log(`WS: ${ui.colors.gray(String(endpoints.ws || ""))}`)
+  const statusText = String(payload?.status || "unknown") === "up" ? c.green.bold("● UP") : c.red.bold("● DOWN")
+  const readyText = payload?.ready ? c.green("yes") : c.yellow("no")
+  const uptimeMs = Number(payload?.uptimeMs || 0)
+  const uptimeStr = uptimeMs > 60000 ? `${(uptimeMs / 60000).toFixed(1)} min` : `${uptimeMs} ms`
+
+  printKV(ui, "Server", c.cyan(serverBaseUrl))
+  printKV(ui, "Status", statusText)
+  printKV(ui, "Ready", readyText)
+  printKV(ui, "Uptime", c.dim(uptimeStr))
+
+  console.log(c.dim("\n  ── Endpoints ──────────────────────"))
+  printKV(ui, "HTTP", c.dim(String(endpoints.http || "")))
+  printKV(ui, "WS", c.dim(String(endpoints.ws || "")))
   if (endpoints.spectatorWs) {
-    console.log(`Spectator WS: ${ui.colors.gray(String(endpoints.spectatorWs))}`)
+    printKV(ui, "Spectator WS", c.dim(String(endpoints.spectatorWs)))
   }
-  console.log("")
-  console.log(ui.colors.bold("Actor Registry"))
-  console.log(`Path: ${String(actorRegistry.path || "(unknown)")}`)
-  console.log(`Loaded: ${String(actorRegistry.loaded || 0)}`)
+
+  console.log(c.dim("\n  ── Actor Registry ─────────────────"))
+  printKV(ui, "Path", String(actorRegistry.path || "(unknown)"))
+  printKV(ui, "Loaded", c.bold(String(actorRegistry.loaded || 0)))
   const actorIds = Array.isArray(actorRegistry.actorIds) ? actorRegistry.actorIds.map((entry) => String(entry)) : []
-  console.log(`Actors: ${actorIds.join(", ") || "(none)"}`)
+  if (actorIds.length > 0) {
+    for (const id of actorIds) {
+      console.log(c.dim(`                   ♣ `) + c.white(id))
+    }
+  } else {
+    printKV(ui, "Actors", c.dim("(none)"))
+  }
   const loadErrors = Array.isArray(actorRegistry.loadErrors) ? actorRegistry.loadErrors : []
   if (loadErrors.length > 0) {
-    console.log(ui.colors.yellow(`Load errors: ${loadErrors.length}`))
+    console.log(c.yellow(`\n  ⚠ Load errors: ${loadErrors.length}`))
     for (const entry of loadErrors.slice(0, 5)) {
       const path = String((entry && entry.path) || "")
       const error = String((entry && entry.error) || "unknown")
-      console.log(ui.colors.yellow(`- ${path}: ${error}`))
+      console.log(c.yellow(`    ${path}: ${error}`))
     }
   }
-  console.log("")
-  console.log(ui.colors.bold("Runtime"))
-  console.log(`Tables: total=${Number(tables.total || 0)} active=${Number(tables.active || 0)} waiting=${Number(tables.waiting || 0)} paused=${Number(tables.paused || 0)}`)
-  console.log(`House bots: registered=${Number(houseBots.registered || 0)} seated=${Number(houseBots.seated || 0)}`)
-  console.log(`Connections: agents=${Number(connections.authenticatedAgents || 0)} spectators=${Number(connections.spectators || 0)}`)
+
+  console.log(c.dim("\n  ── Runtime ────────────────────────"))
+  const t = tables
+  printKV(ui, "Tables", `${c.bold(String(Number(t.total || 0)))} total  ${c.green(String(Number(t.active || 0)))} active  ${c.dim(String(Number(t.waiting || 0)))} waiting  ${c.yellow(String(Number(t.paused || 0)))} paused`)
+  printKV(ui, "House bots", `${c.bold(String(Number(houseBots.registered || 0)))} registered  ${c.green(String(Number(houseBots.seated || 0)))} seated`)
+  printKV(ui, "Connections", `${c.bold(String(Number(connections.authenticatedAgents || 0)))} agents  ${c.cyan(String(Number(connections.spectators || 0)))} spectators`)
 }
 
 async function runHouse(container: AGIContainer & any, options: PokerOptions, args: string[]) {
@@ -1852,14 +1940,14 @@ async function runLeaderboardReset(container: AGIContainer & any, options: Poker
   })
 
   printSection(container, "Leaderboard Reset")
-  console.log(`Server: ${ui.colors.cyan(identity.serverBaseUrl)}`)
-  console.log(`Server ID: ${ui.colors.gray(identity.serverId)}`)
-  console.log(`Ports: http=${identity.port} ws=${identity.wsPort}`)
-  console.log(`Reset at: ${ui.colors.green(new Date(now).toISOString())}`)
+  printKV(ui, "Server", ui.colors.cyan(identity.serverBaseUrl))
+  printKV(ui, "Server ID", ui.colors.dim(identity.serverId))
+  printKV(ui, "Ports", `http=${identity.port}  ws=${identity.wsPort}`)
+  printKV(ui, "Reset at", ui.colors.green.bold(new Date(now).toISOString()))
   if (previous && Number(previous.resetAt || 0) > 0) {
-    console.log(`Previous reset: ${ui.colors.gray(new Date(Number(previous.resetAt)).toISOString())}`)
+    printKV(ui, "Previous", ui.colors.dim(new Date(Number(previous.resetAt)).toISOString()))
   }
-  console.log(ui.colors.gray("Leaderboard baseline reset complete (local diskCache mutation)."))
+  console.log(ui.colors.dim("\n  Leaderboard baseline reset complete."))
 }
 
 async function runLeaderboard(container: AGIContainer & any, options: PokerOptions, args: string[]) {
@@ -1884,7 +1972,7 @@ export async function handler(options: PokerOptions, context: ContainerContext) 
   const subcommand = args[1]
 
   if (!subcommand) {
-    printUsage(standalone)
+    printUsage(container, standalone)
     return
   }
 
@@ -1938,5 +2026,5 @@ export async function handler(options: PokerOptions, context: ContainerContext) 
     return
   }
 
-  printUsage(standalone)
+  printUsage(container, standalone)
 }

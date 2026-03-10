@@ -16,8 +16,7 @@ Luca (Lightweight Universal Conversational Architecture) provides a `container` 
 
 **Detection signals** — this skill applies when any of the following are true:
 - `@soederpop/luca` appears in `package.json` dependencies
-- The `luca` binary is available in PATH
-- A `luca.console.ts` file exists at the project root
+- A `luca.cli.ts` file exists at the project root
 - A `commands/` or `endpoints/` directory exists
 
 **The core rule:** Everything goes through the container. Never `import { readFileSync } from 'fs'` or `import { resolve } from 'path'`. Use `container.fs`, `container.paths`, `container.proc`, etc. The only exception is inside feature *implementations* themselves (e.g., building `fs.ts` may use Node's `fs` internally).
@@ -799,3 +798,11 @@ Commands, endpoints, and scripts all follow the same pattern: `await container.d
 The `cnotes` CLI manages the content (create, validate, inspect, search). The `luca` CLI runs your application code that uses the content (commands, endpoints, servers).
 
 See [references/contentbase-integration.md](./references/contentbase-integration.md) for the full guide: patterns for commands, endpoints, batch scripts, bootstrapping a new project, and CLI interplay.
+
+## 13. Additional Framework Resources
+
+- See [references/api-docs](./references/api-docs) for API documentation for every helper, feature, client, server, including methods, usage examples, getters, the options you can pass when creating them, etc
+- See [references/examples](./references/examples) for examples of how to use features
+- See [references/tutorials](./references/tutorials) for some tutorials on how to do cool things
+
+

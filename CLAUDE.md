@@ -1,6 +1,7 @@
 # Poker AI Agent Arena and Research Tool
 
 - Uses the @soederpop/luca NPM package.  Consult [Project Docs](/Users/jon/@soederpop/luca/docs/) and you also have the Authoring with Luca skill available to you.
+- The luca skill has reference materials which include detailed api docs, tutorials, and examples.
 - You have the luca sandbox mcp available to you.  Always try to use the helpers available here.
 
 ## Project Status
