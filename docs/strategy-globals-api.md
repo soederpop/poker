@@ -277,6 +277,80 @@ const results = await re.calculate()
 
 ---
 
+## Board & Draw Analysis
+
+### `analyzeBoard(board: string[]): BoardTexture`
+
+Analyze the texture of a 3–5 card board (flop, turn, or river).
+
+```ts
+const texture = analyzeBoard(["Th", "7h", "2c"])
+// => {
+//   monotone: false, twoTone: true, rainbow: false,
+//   flushPossible: false, flushDrawPossible: true,
+//   dominantSuit: "h", suitCounts: { c: 1, d: 0, h: 2, s: 0 },
+//   straightPossible: true, highlyConnected: false,
+//   paired: false, trips: false, pairRank: null,
+//   highCard: 10, hasAce: false, hasBroadway: true,
+//   wetness: 5, cardCount: 3
+// }
+```
+
+**BoardTexture shape:**
+
+| Field               | Type               | Description                                           |
+|---------------------|--------------------|-------------------------------------------------------|
+| `monotone`          | `boolean`          | All board cards same suit                              |
+| `twoTone`           | `boolean`          | Exactly 2 cards of one suit                            |
+| `rainbow`           | `boolean`          | All different suits                                    |
+| `flushPossible`     | `boolean`          | 3+ cards of one suit on board                          |
+| `flushDrawPossible` | `boolean`          | Exactly 2 of one suit (flush draw available)           |
+| `dominantSuit`      | `Suit \| null`     | Suit with most cards (null if all equal)                |
+| `suitCounts`        | `Record<Suit, number>` | Count per suit                                     |
+| `straightPossible`  | `boolean`          | 3+ board cards within a 5-rank window                  |
+| `highlyConnected`   | `boolean`          | 4+ board cards within a 5-rank window                  |
+| `paired`            | `boolean`          | Board has a pair                                       |
+| `trips`             | `boolean`          | Board has three of a kind                              |
+| `pairRank`          | `number \| null`   | Rank of the pair (highest if multiple)                 |
+| `highCard`          | `number`           | Highest rank on the board (2–14, A=14)                 |
+| `hasAce`            | `boolean`          | Board contains an ace                                  |
+| `hasBroadway`       | `boolean`          | Board has any T, J, Q, K, or A                         |
+| `wetness`           | `number`           | 0–10 wetness score (higher = more draws possible)      |
+| `cardCount`         | `number`           | Number of board cards analyzed                         |
+
+### `analyzeDraws(heroCards: string[], board: string[]): DrawAnalysis`
+
+Analyze what draws the hero has against the current board.
+
+```ts
+const draws = analyzeDraws(["Kh", "9h"], ["Th", "7h", "2c"])
+// => {
+//   flushDraw: true, flushDrawSuit: "h", flushDrawOuts: 9, madeFlush: false,
+//   openEndedStraightDraw: false, gutshot: true, doubleGutshot: false,
+//   straightDrawOuts: 4, madeStraight: false,
+//   comboDrawCount: 2, totalOuts: 11, overcardCount: 1
+// }
+```
+
+**DrawAnalysis shape:**
+
+| Field                    | Type           | Description                                   |
+|--------------------------|----------------|-----------------------------------------------|
+| `flushDraw`              | `boolean`      | Hero has 4 to a flush                          |
+| `flushDrawSuit`          | `Suit \| null` | Which suit the draw is in                      |
+| `flushDrawOuts`          | `number`       | Cards that complete the flush                  |
+| `madeFlush`              | `boolean`      | Hero already has 5+ of a suit                  |
+| `openEndedStraightDraw`  | `boolean`      | 4 consecutive ranks, open both ends            |
+| `gutshot`                | `boolean`      | 4 to a straight with 1 interior gap            |
+| `doubleGutshot`          | `boolean`      | Two different gutshot fills possible            |
+| `straightDrawOuts`       | `number`       | Cards that complete a straight                 |
+| `madeStraight`           | `boolean`      | Hero already has a straight                    |
+| `comboDrawCount`         | `number`       | Number of simultaneous draws (0, 1, or 2)      |
+| `totalOuts`              | `number`       | Approximate total outs (deduplicated)           |
+| `overcardCount`          | `number`       | Hero cards above the board's highest card       |
+
+---
+
 ## Card Utilities
 
 ### `stringToCard(s: string): CardObject`

@@ -381,6 +381,43 @@ interface DeckConstructor {
   new (): Deck
 }
 
+// ── Board Texture ────────────────────────────────────────────
+
+interface BoardTexture {
+  monotone: boolean
+  twoTone: boolean
+  rainbow: boolean
+  flushPossible: boolean
+  flushDrawPossible: boolean
+  dominantSuit: Suit | null
+  suitCounts: Record<string, number>
+  straightPossible: boolean
+  highlyConnected: boolean
+  paired: boolean
+  trips: boolean
+  pairRank: number | null
+  highCard: number
+  hasAce: boolean
+  hasBroadway: boolean
+  wetness: number
+  cardCount: number
+}
+
+interface DrawAnalysis {
+  flushDraw: boolean
+  flushDrawSuit: Suit | null
+  flushDrawOuts: number
+  madeFlush: boolean
+  openEndedStraightDraw: boolean
+  gutshot: boolean
+  doubleGutshot: boolean
+  straightDrawOuts: number
+  madeStraight: boolean
+  comboDrawCount: number
+  totalOuts: number
+  overcardCount: number
+}
+
 // ── Equity Engine ────────────────────────────────────────────────
 
 interface EquityResult {
@@ -439,6 +476,10 @@ declare global {
   const cardToString: (c: CardObject) => string
   /** Normalize hole cards to combo notation: "AcKd" → "AKo" */
   const normalizeCombo: (cards: string[]) => string
+  /** Analyze board texture: suit distribution, connectedness, wetness */
+  const analyzeBoard: (board: string[]) => BoardTexture
+  /** Analyze hero's draws against the board: flush draws, straight draws, outs */
+  const analyzeDraws: (heroCards: string[], board: string[]) => DrawAnalysis
   /** Built-in strategy engine with profiles and equity estimation */
   const strategy: StrategyFeature
   /** Full luca container — use container.feature() to access any capability */
@@ -1681,6 +1722,10 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       stringToCard: pokurrCore.stringToCard,
       cardToString: pokurrCore.cardToString,
       normalizeCombo: pokurrCore.normalizeCombo,
+
+      // Board and draw analysis
+      analyzeBoard: pokurrCore.analyzeBoard,
+      analyzeDraws: pokurrCore.analyzeDraws,
 
       // Strategy engine (for estimateEquity, profiles, etc.)
       strategy: strategyFeatureForAgent,
