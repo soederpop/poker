@@ -401,6 +401,8 @@ export class PokerServerRuntime {
   private _lastHeartbeatAt = 0
   private _heartbeat?: ReturnType<typeof setInterval>
   private _houseCursor = 0
+  private _adminIpc?: any
+  private _adminSocketPath?: string
 
   private readonly sessions = new Map<any, ClientSession>()
   private readonly socketSeq = new Map<any, number>()
@@ -986,6 +988,94 @@ export class PokerServerRuntime {
     return `poker:server:${this.serverId}:identity`
   }
 
+  get adminSocketPath(): string {
+    if (!this._adminSocketPath) {
+      this._adminSocketPath = this.container.paths.resolve("tmp", `pokurr-admin-${this.port}.sock`)
+    }
+    return this._adminSocketPath
+  }
+
+  private async setupAdminSocket(): Promise<void> {
+    const ipc = this.container.feature("ipcSocket")
+    this._adminIpc = ipc
+
+    await ipc.listen(this.adminSocketPath, true)
+
+    ipc.on("message", (msg: any) => {
+      const data = msg?.data || msg
+      try {
+        const result = this.handleAdminCommand(data)
+        ipc.broadcast(result)
+      } catch (err: any) {
+        ipc.broadcast({ ok: false, error: String(err?.message || err) })
+      }
+    })
+
+    console.log(`[poker-server] admin socket: ${this.adminSocketPath}`)
+  }
+
+  private handleAdminCommand(msg: { action: string; payload?: any }): any {
+    const action = String(msg.action || "")
+    const payload = msg.payload && typeof msg.payload === "object" ? msg.payload : {}
+
+    if (action === "create_table") {
+      const blindsInput = payload.blinds
+      let smallBlind = 1
+      let bigBlind = 2
+
+      if (Array.isArray(blindsInput) && blindsInput.length >= 2) {
+        smallBlind = asNumber(blindsInput[0], 1)
+        bigBlind = asNumber(blindsInput[1], 2)
+      } else if (isRecord(blindsInput)) {
+        smallBlind = asNumber(blindsInput.smallBlind, 1)
+        bigBlind = asNumber(blindsInput.bigBlind, 2)
+      } else if (typeof blindsInput === "string" && blindsInput.includes("/")) {
+        const [small, big] = blindsInput.split("/")
+        smallBlind = asNumber(small, 1)
+        bigBlind = asNumber(big, 2)
+      }
+
+      const table = this.tableManager.createTable({
+        name: payload.name ? String(payload.name) : undefined,
+        blinds: [smallBlind, bigBlind],
+        startingStack: asNumber(payload.startingStack, 100),
+        maxPlayers: Math.max(2, Math.min(9, Math.floor(asNumber(payload.maxPlayers, 9)))),
+        actionTimeout: Math.max(1, Math.floor(asNumber(payload.actionTimeout, this.defaultActionTimeout))),
+      }) as PokerTable
+
+      this.broadcastTables()
+      return { ok: true, table: this.serializeTable(table) }
+    }
+
+    if (action === "list_tables") {
+      const tables = (this.tableManager.tables as PokerTable[]).map((table) => ({
+        ...this.serializeTable(table),
+        handActive: Boolean(this.runtimes.get(table.id)?.handActive),
+      }))
+      return { ok: true, tables }
+    }
+
+    if (action === "server_status") {
+      return {
+        ok: true,
+        serverId: this.serverId,
+        uptime: nowTs() - this._startedAt,
+        tables: (this.tableManager.tables as PokerTable[]).length,
+        connections: this.sessions.size,
+        bots: this.bots.size,
+      }
+    }
+
+    return { ok: false, error: `Unknown admin action: ${action}` }
+  }
+
+  private async stopAdminSocket(): Promise<void> {
+    if (this._adminIpc) {
+      await this._adminIpc.stopServer()
+      this._adminIpc = undefined
+    }
+  }
+
   async start(): Promise<this> {
     if (this._started) {
       return this
@@ -997,6 +1087,7 @@ export class PokerServerRuntime {
     this.setupHttpEndpoints()
     this.setupWebsocketHandlers()
     this.setupSpectatorWebsocketHandlers()
+    await this.setupAdminSocket()
 
     await this.express.start({
       host: this.host,
@@ -1083,6 +1174,7 @@ export class PokerServerRuntime {
     try {
       await this.express.stop()
     } catch {}
+    await this.stopAdminSocket()
     this.sessions.clear()
     this.socketSeq.clear()
     this.socketsByBot.clear()
@@ -1583,46 +1675,6 @@ export class PokerServerRuntime {
         serverId: this.serverId,
         tables,
       })
-    })
-
-    app.post("/api/v1/tables", (req: any, res: any) => {
-      try {
-        const payload = toPayload(req.body)
-        const name = payload.name ? String(payload.name).trim() : undefined
-
-        const blindsInput = payload.blinds
-        let smallBlind = 1
-        let bigBlind = 2
-
-        if (Array.isArray(blindsInput) && blindsInput.length >= 2) {
-          smallBlind = asNumber(blindsInput[0], 1)
-          bigBlind = asNumber(blindsInput[1], 2)
-        } else if (isRecord(blindsInput)) {
-          smallBlind = asNumber(blindsInput.smallBlind, 1)
-          bigBlind = asNumber(blindsInput.bigBlind, 2)
-        } else if (typeof blindsInput === "string" && blindsInput.includes("/")) {
-          const [small, big] = blindsInput.split("/")
-          smallBlind = asNumber(small, 1)
-          bigBlind = asNumber(big, 2)
-        }
-
-        const table = this.tableManager.createTable({
-          name,
-          blinds: [smallBlind, bigBlind],
-          startingStack: asNumber(payload.startingStack, 100),
-          maxPlayers: Math.max(2, Math.min(9, Math.floor(asNumber(payload.maxPlayers, 9)))),
-          actionTimeout: Math.max(1, Math.floor(asNumber(payload.actionTimeout, this.defaultActionTimeout))),
-        }) as PokerTable
-
-        this.broadcastTables()
-
-        res.json({
-          ok: true,
-          table: this.serializeTable(table),
-        })
-      } catch (error: any) {
-        res.status(500).json({ error: String(error?.message || error) })
-      }
     })
 
     app.get("/api/v1/tables/:tableId/state", (req: any, res: any) => {

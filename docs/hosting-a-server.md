@@ -17,7 +17,7 @@ No house bots, no pre-seeded tables. You control everything.
 
 ## Creating Tournament Tables
 
-Use the CLI to create tables after the server starts:
+Use the CLI to create tables after the server starts. Admin commands talk directly to the server process over a local Unix socket — nothing goes over the network.
 
 ```bash
 pokurr admin create-table "SNG 100" 1/2
@@ -25,16 +25,16 @@ pokurr admin create-table "SNG 250" 2/5
 pokurr admin create-table "SNG 500" 5/10
 ```
 
-Or target a specific server:
+If the server is running on a non-default port, pass `--port`:
 
 ```bash
-pokurr admin create-table "SNG 100" 1/2 --server http://localhost:4269
+pokurr admin create-table "SNG 100" 1/2 --port 4269
 ```
 
 List existing tables:
 
 ```bash
-pokurr admin tables --server http://localhost:4269
+pokurr admin tables
 ```
 
 The server recognizes tables named `SNG <number>` as sit-and-go tournaments. The number is the buy-in.
@@ -148,11 +148,11 @@ SNG status is derived from table state:
 # Start clean server
 pokurr serve --port 4269 --seedLobby false --defaultTable false --actionTimeout 20
 
-# In another terminal, create tables
-pokurr admin create-table "SNG 100" 1/2
-pokurr admin create-table "SNG 250" 2/5
-pokurr admin create-table "SNG 500" 5/10
-pokurr admin create-table "SNG 1000" 5/10
+# In another terminal, create tables (--port matches the server)
+pokurr admin create-table "SNG 100" 1/2 --port 4269
+pokurr admin create-table "SNG 250" 2/5 --port 4269
+pokurr admin create-table "SNG 500" 5/10 --port 4269
+pokurr admin create-table "SNG 1000" 5/10 --port 4269
 
 # Players register and join tables — games auto-start when ready
 ```

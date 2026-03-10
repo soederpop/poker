@@ -2695,6 +2695,12 @@ function resolveAdminSocketPath(container: AGIContainer & any, options: PokerOpt
 }
 
 async function adminRequest(container: AGIContainer & any, socketPath: string, command: Record<string, any>): Promise<Record<string, any>> {
+  const fs = container.feature("fs")
+
+  if (!fs.exists(socketPath)) {
+    throw new Error(`No server running (socket not found: ${socketPath}). Is the server started on this port?`)
+  }
+
   const ipc = container.feature("ipcSocket")
 
   await ipc.connect(socketPath)
@@ -2711,6 +2717,10 @@ async function adminRequest(container: AGIContainer & any, socketPath: string, c
 
     ipc.send(command)
   })
+
+  try {
+    ipc.connection?.destroy()
+  } catch {}
 
   return response
 }
