@@ -8,7 +8,9 @@
   "scripts": {
     "build:wasm": "bun run --cwd packages/pokurr-equity build",
     "test": "bun run build:wasm && bun test packages/pokurr-core/test test",
-    "demo:js-api": "luca run demos/js-api.md"
+    "demo:js-api": "luca run demos/js-api.md",
+    "inline-wasm": "bun run scripts/inline-wasm.ts",
+    "compile": "bun run inline-wasm && bun build src/cli.ts --compile --outfile dist/pokurr --external node-llama-cpp --define 'process.env.POKURR_COMPILED=\"true\"'"
   },
   "dependencies": {
     "@soederpop/luca": "*"

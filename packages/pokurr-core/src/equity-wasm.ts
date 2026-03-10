@@ -33,6 +33,16 @@ function normalizeModule(candidate: unknown): WasmModule | null {
 }
 
 async function importWasmModule(): Promise<WasmModule | null> {
+  // Compiled binary path: use the inlined WASM module generated at build time
+  if (process.env.POKURR_COMPILED) {
+    try {
+      const inlineImport = (await import("../../src/generated/pokurr-equity-inline.js")) as Record<string, unknown>
+      return normalizeModule(inlineImport.default ?? inlineImport)
+    } catch {
+      // Fall through to standard loading paths
+    }
+  }
+
   try {
     const nodeImport = (await import("@pokurr/equity/node")) as Record<string, unknown>
     return normalizeModule(nodeImport.default ?? nodeImport)

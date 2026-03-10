@@ -1,9 +1,13 @@
 import type { AGIContainer } from "@soederpop/luca/agi"
 import { equityEngine } from "@pokurr/core"
+import { join } from "path"
+import { mkdirSync, existsSync } from "fs"
 
 import "./features/game-engine"
 import "./features/strategy"
 import "./features/table-manager"
+
+export type BootMode = "project" | "standalone"
 
 export type PokerContainerServices = {
   diskCache: any
@@ -12,14 +16,45 @@ export type PokerContainerServices = {
   tableManager: any
 }
 
-export function configurePokerContainer(container: AGIContainer): PokerContainerServices {
-  container.docs = container.feature("contentDb", {
-    rootPath: container.paths.resolve("docs"),
-  })
+function pokurrHomeDir(): string {
+  const home = process.env.HOME || process.env.USERPROFILE || "~"
+  return join(home, ".pokurr")
+}
+
+function ensurePokurrHome(): string {
+  const dir = pokurrHomeDir()
+  const cacheDir = join(dir, "cache")
+
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
+  }
+  if (!existsSync(cacheDir)) {
+    mkdirSync(cacheDir, { recursive: true })
+  }
+
+  return dir
+}
+
+export function isStandaloneMode(container: AGIContainer): boolean {
+  return container.state.get("pokurrBootMode" as any) === "standalone"
+}
+
+export function configurePokerContainer(container: AGIContainer, mode: BootMode = "project"): PokerContainerServices {
+  const standalone = mode === "standalone"
+
+  if (!standalone) {
+    container.docs = container.feature("contentDb", {
+      rootPath: container.paths.resolve("docs"),
+    })
+  }
+
+  const cachePath = standalone
+    ? join(pokurrHomeDir(), "cache")
+    : container.paths.resolve("tmp", "poker-cache")
 
   const diskCache = container.feature("diskCache", {
     enable: true,
-    path: container.paths.resolve("tmp", "poker-cache"),
+    path: cachePath,
   })
 
   const gameEngine = container.feature("gameEngine", { enable: true })
@@ -36,10 +71,18 @@ export function configurePokerContainer(container: AGIContainer): PokerContainer
 
 export async function bootPokerContainer(
   container: AGIContainer,
-  options: { logBackend?: boolean } = {},
+  options: { logBackend?: boolean; mode?: BootMode } = {},
 ): Promise<{ backend: "wasm" }> {
+  const mode = options.mode || "project"
+
   await container.helpers.discoverAll()
-  configurePokerContainer(container)
+  configurePokerContainer(container, mode)
+
+  if (mode === "standalone") {
+    ensurePokurrHome()
+  }
+
+  container.state.set("pokurrBootMode" as any, mode)
 
   const alreadyBooted = Boolean(container.state.get("pokerBooted" as any))
   const hasWasm = await equityEngine.hasWasmBackend()

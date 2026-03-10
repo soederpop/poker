@@ -1,4 +1,6 @@
 import type { AGIContainer } from "@soederpop/luca/agi"
+import { isStandaloneMode } from "../container"
+import { getEmbeddedHouseActorsMap } from "../src/generated/house-actors"
 
 import {
   applyEvent,
@@ -602,6 +604,30 @@ export class PokerServerRuntime {
     return actor
   }
 
+  private async loadHouseActors(): Promise<void> {
+    if (isStandaloneMode(this.container)) {
+      return this.loadEmbeddedHouseActors()
+    }
+    return this.loadHouseActorsFromDisk()
+  }
+
+  private loadEmbeddedHouseActors(): void {
+    this.houseActors.clear()
+    this.houseActorLoadErrors.length = 0
+
+    const embedded = getEmbeddedHouseActorsMap()
+    for (const [id, actor] of embedded) {
+      this.houseActors.set(id, {
+        id: actor.id,
+        displayName: actor.displayName,
+        description: actor.description,
+        profileName: actor.profileName,
+        decide: actor.decide,
+        sourcePath: "(embedded)",
+      })
+    }
+  }
+
   private async loadHouseActorsFromDisk(): Promise<void> {
     this.houseActors.clear()
     this.houseActorLoadErrors.length = 0
@@ -966,7 +992,7 @@ export class PokerServerRuntime {
     }
 
     await this.loadIdentityState()
-    await this.loadHouseActorsFromDisk()
+    await this.loadHouseActors()
     this.ensureHouseBankroll()
     this.setupHttpEndpoints()
     this.setupWebsocketHandlers()

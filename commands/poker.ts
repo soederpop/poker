@@ -4,7 +4,8 @@ import type { AGIContainer } from "@soederpop/luca/agi"
 import { CommandOptionsSchema } from "@soederpop/luca/schemas"
 import { equityEngine, Range } from "@pokurr/core"
 
-import { bootPokerContainer } from "../container"
+import { bootPokerContainer, isStandaloneMode } from "../container"
+import { join } from "path"
 import { buildDeckStrings, parseExactHand, splitCards, withoutDeadCards } from "../lib/cards"
 import { PRNG } from "../lib/prng"
 import { loadSituation } from "../lib/situations"
@@ -132,20 +133,21 @@ function parsePosition(value?: string): PokerPosition {
   return "BTN"
 }
 
-function printUsage() {
+function printUsage(standalone = false) {
+  const cmd = standalone ? "pokurr" : "luca poker"
   console.log("Usage:")
-  console.log("  luca poker analyze equity AhKd QsQc [--board Kh7d2h]")
-  console.log("  luca poker analyze range \"ATs+,AJo+\" --vs \"QQ+,AKs\" [--board Kh7d2h]")
-  console.log("  luca poker analyze hand AhKd --board Kh7d2h5s [--potSize 30 --toCall 10]")
-  console.log("  luca poker sim --situation situations/turned-flush-draw --iterations 1000 --strategy hero=tight-aggressive villain=loose-passive --seed 42")
-  console.log("  luca poker serve --port 3000 [--anyPort true] [--force true] --seedLobby true --houseActorsPath house/actors --botThinkDelayMinMs 1200 --botThinkDelayMaxMs 2600")
-  console.log("  luca poker seed [http://localhost:3000] [--seedCount 4] [--seedPrefix seed-bot]")
-  console.log("  luca poker new-agent my-bot [tag]")
-  console.log("  luca poker register http://localhost:3000 --name my-bot")
-  console.log("  luca poker join ws://localhost:3001 --token <token> [--manual]")
-  console.log("  luca poker watch ws://localhost:3002 [--table <tableId>]")
-  console.log("  luca poker house status [http://localhost:3000] [--server http://localhost:3000]")
-  console.log("  luca poker leaderboard reset [http://localhost:3000] [--server http://localhost:3000] [--force]")
+  console.log(`  ${cmd} analyze equity AhKd QsQc [--board Kh7d2h]`)
+  console.log(`  ${cmd} analyze range "ATs+,AJo+" --vs "QQ+,AKs" [--board Kh7d2h]`)
+  console.log(`  ${cmd} analyze hand AhKd --board Kh7d2h5s [--potSize 30 --toCall 10]`)
+  console.log(`  ${cmd} sim --situation situations/turned-flush-draw --iterations 1000 --strategy hero=tight-aggressive villain=loose-passive --seed 42`)
+  console.log(`  ${cmd} serve --port 3000 [--anyPort true] [--force true] --seedLobby true --botThinkDelayMinMs 1200 --botThinkDelayMaxMs 2600`)
+  console.log(`  ${cmd} seed [http://localhost:3000] [--seedCount 4] [--seedPrefix seed-bot]`)
+  console.log(`  ${cmd} new-agent my-bot [tag]`)
+  console.log(`  ${cmd} register http://localhost:3000 --name my-bot`)
+  console.log(`  ${cmd} join ws://localhost:3001 --token <token> [--manual]`)
+  console.log(`  ${cmd} watch ws://localhost:3002 [--table <tableId>]`)
+  console.log(`  ${cmd} house status [http://localhost:3000] [--server http://localhost:3000]`)
+  console.log(`  ${cmd} leaderboard reset [http://localhost:3000] [--server http://localhost:3000] [--force]`)
 }
 
 function normalizeAgentSlug(rawInput: string): string {
@@ -310,11 +312,17 @@ async function resolveHouseActorTemplate(container: AGIContainer & any, options:
 async function runNewAgent(container: AGIContainer & any, options: PokerOptions, args: string[]) {
   const slug = normalizeAgentSlug(String(args[0] || options.name || ""))
   const displayName = titleFromSlug(slug)
-  const actorTemplate = await resolveHouseActorTemplate(container, options, String(args[1] || ""))
+  const standalone = isStandaloneMode(container)
+  const rawTemplate = String(args[1] || "").trim().toLowerCase()
+  const knownActors = ["nit", "tag", "lag", "maniac", "calling-station"]
+  const actorTemplate = standalone
+    ? (knownActors.includes(rawTemplate) ? rawTemplate : null)
+    : await resolveHouseActorTemplate(container, options, rawTemplate)
   const fs = container.feature("fs", { enable: true })
   const ui = container.feature("ui")
 
-  const rootDir = container.paths.resolve(slug)
+  // In standalone mode, scaffold relative to CWD; in project mode, relative to project root
+  const rootDir = standalone ? join(process.cwd(), slug) : container.paths.resolve(slug)
   if (await fs.existsAsync(rootDir)) {
     throw new Error(`Target directory already exists: ${rootDir}`)
   }
@@ -618,7 +626,7 @@ async function runSimulation(container: AGIContainer & any, options: PokerOption
   const cacheKey = `poker:sim:${simHash}`
   const diskCache = container.feature("diskCache", {
     enable: true,
-    path: container.paths.resolve("tmp", "poker-cache"),
+    path: pokurrCachePath(container),
   })
 
   await diskCache.set(cacheKey, result)
@@ -690,10 +698,18 @@ function resolveServerIdentityForLeaderboardReset(
   }
 }
 
+function pokurrCachePath(container: AGIContainer & any): string {
+  if (isStandaloneMode(container)) {
+    const home = process.env.HOME || process.env.USERPROFILE || "~"
+    return join(home, ".pokurr", "cache")
+  }
+  return container.paths.resolve("tmp", "poker-cache")
+}
+
 function clientDiskCache(container: AGIContainer & any): any {
   return container.feature("diskCache", {
     enable: true,
-    path: container.paths.resolve("tmp", "poker-cache"),
+    path: pokurrCachePath(container),
   })
 }
 
@@ -734,6 +750,11 @@ function botEnvPrefix(botId: string): string {
 }
 
 async function resolvePokerProjectRoot(container: AGIContainer & any): Promise<string> {
+  // In standalone mode, use CWD as the project root for .env and config files
+  if (isStandaloneMode(container)) {
+    return process.cwd()
+  }
+
   const fs = container.feature("fs", { enable: true })
   const cwdRoot = String(container.cwd || "")
   const cwdCommandPath = container.paths.resolve(cwdRoot, "commands", "poker.ts")
@@ -1811,7 +1832,7 @@ async function runLeaderboardReset(container: AGIContainer & any, options: Poker
 
   const diskCache = container.feature("diskCache", {
     enable: true,
-    path: container.paths.resolve("tmp", "poker-cache"),
+    path: pokurrCachePath(container),
   })
 
   const resetKey = `poker:server:${identity.serverId}:leaderboard:reset-state`
@@ -1855,12 +1876,15 @@ export async function handler(options: PokerOptions, context: ContainerContext) 
   const container = context.container as AGIContainer & any
   const args = container.argv._ as string[]
 
-  await bootPokerContainer(container, { logBackend: false })
+  // Detect standalone mode from cli.ts pre-set state or POKURR_COMPILED env
+  const mode = container.state.get("pokurrBootMode" as any) || (process.env.POKURR_COMPILED === "true" ? "standalone" : "project")
+  await bootPokerContainer(container, { logBackend: false, mode })
 
+  const standalone = isStandaloneMode(container)
   const subcommand = args[1]
 
   if (!subcommand) {
-    printUsage()
+    printUsage(standalone)
     return
   }
 
@@ -1914,5 +1938,5 @@ export async function handler(options: PokerOptions, context: ContainerContext) 
     return
   }
 
-  printUsage()
+  printUsage(standalone)
 }
