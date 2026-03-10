@@ -1585,6 +1585,46 @@ export class PokerServerRuntime {
       })
     })
 
+    app.post("/api/v1/tables", (req: any, res: any) => {
+      try {
+        const payload = toPayload(req.body)
+        const name = payload.name ? String(payload.name).trim() : undefined
+
+        const blindsInput = payload.blinds
+        let smallBlind = 1
+        let bigBlind = 2
+
+        if (Array.isArray(blindsInput) && blindsInput.length >= 2) {
+          smallBlind = asNumber(blindsInput[0], 1)
+          bigBlind = asNumber(blindsInput[1], 2)
+        } else if (isRecord(blindsInput)) {
+          smallBlind = asNumber(blindsInput.smallBlind, 1)
+          bigBlind = asNumber(blindsInput.bigBlind, 2)
+        } else if (typeof blindsInput === "string" && blindsInput.includes("/")) {
+          const [small, big] = blindsInput.split("/")
+          smallBlind = asNumber(small, 1)
+          bigBlind = asNumber(big, 2)
+        }
+
+        const table = this.tableManager.createTable({
+          name,
+          blinds: [smallBlind, bigBlind],
+          startingStack: asNumber(payload.startingStack, 100),
+          maxPlayers: Math.max(2, Math.min(9, Math.floor(asNumber(payload.maxPlayers, 9)))),
+          actionTimeout: Math.max(1, Math.floor(asNumber(payload.actionTimeout, this.defaultActionTimeout))),
+        }) as PokerTable
+
+        this.broadcastTables()
+
+        res.json({
+          ok: true,
+          table: this.serializeTable(table),
+        })
+      } catch (error: any) {
+        res.status(500).json({ error: String(error?.message || error) })
+      }
+    })
+
     app.get("/api/v1/tables/:tableId/state", (req: any, res: any) => {
       const tableId = String(req.params?.tableId || "").trim()
       if (!tableId) {

@@ -5,3 +5,4 @@ node_modules/
 secrets/
 dist/
 src/generated/
+.claude/settings.local.json
