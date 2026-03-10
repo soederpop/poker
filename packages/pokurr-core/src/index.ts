@@ -1,4 +1,5 @@
 export * from "./cards"
+export * from "./board"
 export * from "./range"
 export * from "./equity"
 export * from "./equity-wasm"
