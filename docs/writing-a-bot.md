@@ -12,27 +12,42 @@ This creates:
 
 ```
 my-bot/
-├── strategy.ts      # Your decision logic — this is the only file that matters
-└── docs/situations/ # Hand review workspace
+├── strategy.ts           # Your decision logic — the only file that matters
+├── types/pokurr.d.ts     # TypeScript types for all injected globals
+├── tsconfig.json         # TypeScript config (references the types)
+├── README.md             # Quick-start instructions
+└── docs/situations/      # Hand review workspace
+    └── README.md
 ```
 
 You can optionally seed from a house actor style:
 
 ```bash
-pokurr new-agent my-bot tag    # tight-aggressive baseline
-pokurr new-agent my-bot lag    # loose-aggressive
-pokurr new-agent my-bot nit    # ultra-tight
-pokurr new-agent my-bot maniac # hyper-aggressive
+pokurr new-agent my-bot tag              # tight-aggressive baseline
+pokurr new-agent my-bot lag              # loose-aggressive
+pokurr new-agent my-bot nit              # ultra-tight
+pokurr new-agent my-bot maniac           # hyper-aggressive
+pokurr new-agent my-bot calling-station  # passive caller
+```
+
+If the types ever get stale (e.g. after a pokurr update), regenerate them:
+
+```bash
+pokurr types           # run from inside your bot directory
+pokurr types ./my-bot  # or pass the path
 ```
 
 ## Quick Start
 
 ```bash
-# Terminal 1: register your bot on the server
-pokurr register http://localhost:4269 --name my-bot
+# Terminal 1: start a server with house bots to play against
+pokurr serve --seedLobby true
 
-# Terminal 2: join with your agent
-pokurr join ws://localhost:4270 --token <token> --agent ./my-bot
+# Terminal 2: register your bot (default HTTP port is 3000)
+pokurr register http://localhost:3000 --name my-bot
+
+# Terminal 3: join with your agent (default WS port is 3001)
+pokurr join ws://localhost:3001 --token <token> --agent ./my-bot
 ```
 
 That's it. Your `strategy.ts` runs locally on your machine. The server sends game state over the WebSocket, your `decide()` runs, and the action goes back over the wire.
@@ -122,9 +137,9 @@ he.averageWinPercent  // win % vs N random opponents
 ```ts
 // Create a range from standard notation
 const villainRange = new Range("QQ+,AKs,AKo")
-villainRange.size           // number of combos
-villainRange.percentile     // % of all hands
-villainRange.strength       // aggregate strength
+villainRange.size           // number of combos (getter)
+villainRange.percentile     // % of all hands (getter)
+villainRange.strength       // aggregate strength (getter)
 
 // Check if a hand is in a range
 villainRange.includes("AcKd") // true
@@ -149,7 +164,7 @@ const result = await compareRanges(
   new Range("TT+,AQs+"),
   { board: ["Ks", "7d", "2h"], iterations: 10000 }
 )
-// result => { us: 0.62, them: 0.35, tie: 0.03 }
+// result => { hero: 0.62, villain: 0.35, tie: 0.03 }
 ```
 
 ### Strategy Engine
@@ -230,7 +245,7 @@ export async function decide(context: DecisionContext): Promise<StrategyDecision
     villainRange,
     { board: context.board, iterations: 5000 }
   )
-  const ourEquity = rangeResult.us
+  const ourEquity = rangeResult.hero
 
   // Strong hand (>65% equity): bet or raise for value
   if (ourEquity > 0.65) {
@@ -307,7 +322,7 @@ export async function decide(context: DecisionContext): Promise<StrategyDecision
 Start a server with house bots to practice against:
 
 ```bash
-# Server with house bots enabled
+# Server with house bots enabled (default ports: HTTP 3000, WS 3001)
 pokurr serve --seedLobby true
 
 # Join with your agent
@@ -319,7 +334,7 @@ pokurr join ws://localhost:3001 --token <token> --agent ./my-bot
 Play alongside your bot, approving or overriding each decision:
 
 ```bash
-pokurr join ws://localhost:4270 --token <token> --agent ./my-bot --manual
+pokurr join ws://localhost:3001 --token <token> --agent ./my-bot --manual
 ```
 
 Each turn you'll see your bot's decision and can accept it or pick your own action.
