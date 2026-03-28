@@ -1121,7 +1121,7 @@ async function readBotEnvState(container: AGIContainer & any): Promise<BotEnvSta
   const rootDir = await resolvePokerProjectRoot(container)
   const envPath = container.paths.resolve(rootDir, ".env")
   const exists = await fs.existsAsync(envPath)
-  const fullContent = exists ? String(await fs.readFileAsync(envPath)) : ""
+  const fullContent = exists ? await fs.readFileAsync(envPath) : ""
 
   const vars: Record<string, string> = {}
   const startIndex = fullContent.indexOf(BOT_ENV_BLOCK_START)

@@ -25,6 +25,8 @@ container.features.introspect('fs')
 
 ```ts
 const fs = container.feature('fs')
+fs.$methods             // quick list: ['readFile', 'writeFile', ...]
+fs.$getters             // quick list: ['cwd', 'sep', ...]
 fs.introspect()         // structured object
 fs.introspectAsText()   // markdown documentation
 ```

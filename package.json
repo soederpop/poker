@@ -10,10 +10,11 @@
     "test": "bun run build:wasm && bun test packages/pokurr-core/test test",
     "demo:js-api": "luca run demos/js-api.md",
     "inline-wasm": "bun run scripts/inline-wasm.ts",
-    "compile": "bun run inline-wasm && bun build src/cli.ts --compile --outfile dist/pokurr --external node-llama-cpp --define 'process.env.POKURR_COMPILED=\"true\"'"
+    "inline-house-actors": "bun run scripts/inline-house-actors.ts",
+    "compile": "bun run inline-wasm && bun run inline-house-actors && bun build src/cli.ts --compile --outfile dist/pokurr --external node-llama-cpp --define 'process.env.POKURR_COMPILED=\"true\"'"
   },
   "dependencies": {
-    "@soederpop/luca": "*"
+    "@soederpop/luca": ">=0.1.1"
   },
   "luca": {
     "aliases": ["luca-poker", "poker", "poker app", "poker playground"]

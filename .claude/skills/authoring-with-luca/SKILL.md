@@ -102,6 +102,8 @@ container.features.introspect('fs')
 
 // Instance-level introspection
 const fs = container.feature('fs')
+fs.$methods             // quick list of method names
+fs.$getters             // quick list of getter names
 fs.introspect()         // structured object
 fs.introspectAsText()   // markdown documentation
 ```

@@ -1818,7 +1818,7 @@ export class PokerServerRuntime {
     const fs = this.container.feature("fs", { enable: true })
     const fixturePath = await this.resolveWorkspacePath("test/fixtures/golden-hands.json")
     const raw = await fs.readFileAsync(fixturePath)
-    const parsed = JSON.parse(String(raw || "[]"))
+    const parsed = JSON.parse(raw || "[]")
 
     if (!Array.isArray(parsed)) {
       throw new Error("Invalid golden fixtures payload: expected array")

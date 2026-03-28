@@ -25,6 +25,46 @@ The goal is one shared poker core that supports:
 - `wasm-pack` on your `PATH` (or the scripts should point to your cargo bin location)
 - `@soederpop/luca` CLI (`npm i -g @soederpop/luca` or install via the project dependencies)
 
+### Installing Rust + wasm-pack
+
+#### macOS
+
+```bash
+# Install rustup (Rust toolchain manager + cargo)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Add the WebAssembly compile target
+rustup target add wasm32-unknown-unknown
+
+# Install wasm-pack
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+```
+
+#### Linux (Debian/Ubuntu and similar)
+
+```bash
+# System deps for building native code
+sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+
+# Install rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Add the WebAssembly compile target
+rustup target add wasm32-unknown-unknown
+
+# Install wasm-pack
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+```
+
+After installation, verify everything is in place:
+
+```bash
+rustc --version
+wasm-pack --version
+```
+
 ## Quick Start
 
 From this directory:
