@@ -1264,10 +1264,15 @@ export class PokerServerRuntime {
       return false
     }
 
-    const actorId = actorIds[this._houseCursor % actorIds.length] as string
+    const preferredActorId = typeof table.preferredHouseActor === "string" ? table.preferredHouseActor.trim() : ""
+    const actorId = preferredActorId && this.houseActors.has(preferredActorId)
+      ? preferredActorId
+      : actorIds[this._houseCursor % actorIds.length] as string
     const actor = this.houseActors.get(actorId)
     const profile = String(actor?.profileName || actorId || "tag")
-    this._houseCursor += 1
+    if (!(preferredActorId && actorId === preferredActorId)) {
+      this._houseCursor += 1
+    }
 
     const actorSlug = actorId.replace(/[^a-z0-9-]/gi, "-").toLowerCase()
     const botId = `house_${actorSlug}_${this.container.utils.uuid().replace(/-/g, "").slice(0, 8)}`
@@ -2654,6 +2659,7 @@ export class PokerServerRuntime {
         startingStack: asNumber(incoming.payload.startingStack, 100),
         maxPlayers: Math.max(2, Math.min(9, Math.floor(asNumber(incoming.payload.maxPlayers, 9)))),
         actionTimeout: Math.max(1, Math.floor(asNumber(incoming.payload.actionTimeout, this.defaultActionTimeout))),
+        preferredHouseActor: incoming.payload.preferredHouseActor ? String(incoming.payload.preferredHouseActor) : undefined,
       }) as PokerTable
 
       this.send(socket, "table_created", this.serializeTable(table))
@@ -3054,11 +3060,24 @@ export class PokerServerRuntime {
       return
     }
 
-    if (!isSngTable(table)) {
+    const runtime = this.ensureRuntime(table)
+
+    if (table.preferredHouseActor && table.maxPlayers === 2) {
+      const realPlayers = table.players.filter((entry) => !entry.isHouseBot)
+      if (realPlayers.length >= 1) {
+        const missing = Math.max(0, 2 - table.players.length)
+        for (let i = 0; i < missing; i += 1) {
+          if (!this.addHouseBotToTable(table, runtime)) {
+            break
+          }
+        }
+      }
       return
     }
 
-    const runtime = this.ensureRuntime(table)
+    if (!isSngTable(table)) {
+      return
+    }
 
     const realPlayers = table.players.filter((entry) => !entry.isHouseBot)
     const housePlayers = table.players.filter((entry) => entry.isHouseBot)

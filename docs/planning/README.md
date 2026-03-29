@@ -18,6 +18,10 @@ Suggested conventions:
 
 Current planning docs:
 
+- `2026-03-29-play-mode-stabilization-handoff.md`
+  - resume-ready handoff for stabilizing the new `luca poker play` Ink TUI and validating command wiring
+- `2026-03-29-regret-minimizer-first-slice.md`
+  - first executable implementation slice for bucketed regret tracking, session runs, and journal output
 - `2026-03-28-public-roadshow-readiness.md`
   - top-level roadmap for making the project public-demo ready
 - `2026-03-28-offline-analysis-and-local-bot-product.md`

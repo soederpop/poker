@@ -10,6 +10,7 @@ import { buildDeckStrings, parseExactHand, splitCards, withoutDeadCards } from "
 import { PRNG } from "../lib/prng"
 import { loadSituation } from "../lib/situations"
 import { createNewAgentScaffold } from "../lib/new-agent-scaffold"
+import { runPlayMode } from "../lib/poker-play"
 import type { PokerPosition } from "../features/strategy"
 import { Actor } from "../features/actor"
 import { createInitialGameState, type GameState } from "../features/game-engine"
@@ -70,6 +71,7 @@ export const argsSchema = CommandOptionsSchema.extend({
   manual: booleanOption(false).describe("Join mode: prompt for human action overrides each turn"),
   agent: z.string().optional().describe("Join mode: path to agent folder with strategy.ts"),
   anyPort: booleanOption(false).describe("Serve mode: find first open HTTP/WS/spectator triplet starting at --port"),
+  viewOpponentHolecards: booleanOption(false).describe("Play mode: reveal the opponent's hole cards in the TUI for debugging/observation"),
   force: booleanOption(false).describe("Bypass confirmation prompts for destructive operations"),
 })
 
@@ -192,6 +194,7 @@ function printUsage(container: AGIContainer & any, standalone = false) {
   usage("types [path]", "Generate/update TypeScript types for an agent project")
   usage("register http://localhost:3000 --name my-bot", "Register a bot")
   usage("join ws://localhost:3001 --token <token>", "Connect bot to table")
+  usage("play [http://localhost:3000] --vs balanced", "Play yourself against a selected house bot in an Ink TUI")
   usage("watch ws://localhost:3002 [--table <id>]", "Spectate a table")
   usage("dashboard [http://localhost:3000]", "Interactive table browser + spectator")
 
@@ -2503,6 +2506,22 @@ async function runDashboard(container: AGIContainer & any, options: PokerOptions
   })
 }
 
+async function runPlay(container: AGIContainer & any, options: PokerOptions, args: string[]) {
+  const first = String(args[0] || "").trim()
+  const second = String(args[1] || "").trim()
+  const firstLooksLikeServer = /^https?:\/\//i.test(first)
+  const positionalOpponent = firstLooksLikeServer ? second : first
+  const serverBaseUrl = (firstLooksLikeServer ? first : String(options.server || "").trim()) || `http://127.0.0.1:${options.port}`
+  const opponent = positionalOpponent || String(options.vs || "").trim() || "balanced"
+  await runPlayMode(container, {
+    serverBaseUrl,
+    opponent,
+    name: options.name,
+    actionTimeout: options.actionTimeout,
+    viewOpponentHolecards: options.viewOpponentHolecards,
+  })
+}
+
 async function runWatch(container: AGIContainer & any, options: PokerOptions, args: string[]) {
   const wsUrl = String(args[0] || "").trim()
   if (!wsUrl) {
@@ -2982,6 +3001,11 @@ export async function handler(options: PokerOptions, context: ContainerContext) 
 
   if (subcommand === "join") {
     await runJoin(container, options, args.slice(2))
+    return
+  }
+
+  if (subcommand === "play") {
+    await runPlay(container, options, args.slice(2))
     return
   }
 

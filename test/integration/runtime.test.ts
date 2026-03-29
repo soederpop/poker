@@ -147,13 +147,14 @@ function installAutoFolder(player: PlayerHarness) {
   return unsubscribe
 }
 
-async function createTable(player: PlayerHarness, name: string) {
+async function createTable(player: PlayerHarness, name: string, overrides: Record<string, unknown> = {}) {
   await player.client.send("create_table", {
     name,
     blinds: [1, 2],
     startingStack: 120,
     maxPlayers: 2,
     actionTimeout: 1,
+    ...overrides,
   })
   const created = await player.inbox.waitFor("table_created")
   return String(created.payload?.id)

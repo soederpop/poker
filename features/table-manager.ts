@@ -23,6 +23,7 @@ export type PokerTable = {
   startingStack: number
   maxPlayers: number
   actionTimeout: number
+  preferredHouseActor?: string
   status: TableStatus
   players: TablePlayer[]
   createdAt: number
@@ -126,6 +127,7 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     startingStack?: number
     maxPlayers?: number
     actionTimeout?: number
+    preferredHouseActor?: string
   }): PokerTable {
     const [smallBlind, bigBlind] = options.blinds
     const now = Date.now()
@@ -138,6 +140,7 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
       startingStack: options.startingStack ?? this.options.defaultStartingStack,
       maxPlayers: options.maxPlayers ?? this.options.defaultMaxPlayers,
       actionTimeout: options.actionTimeout ?? this.options.defaultActionTimeout,
+      ...(options.preferredHouseActor ? { preferredHouseActor: options.preferredHouseActor } : {}),
       status: "waiting",
       players: [],
       createdAt: now,
