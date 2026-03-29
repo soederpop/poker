@@ -9,6 +9,7 @@ import { join, resolve } from "path"
 import { buildDeckStrings, parseExactHand, splitCards, withoutDeadCards } from "../lib/cards"
 import { PRNG } from "../lib/prng"
 import { loadSituation } from "../lib/situations"
+import { createNewAgentScaffold } from "../lib/new-agent-scaffold"
 import type { PokerPosition } from "../features/strategy"
 import { Actor } from "../features/actor"
 import { createInitialGameState, type GameState } from "../features/game-engine"
@@ -601,7 +602,7 @@ async function runNewAgent(container: AGIContainer & any, options: PokerOptions,
   const displayName = titleFromSlug(slug)
   const standalone = isStandaloneMode(container)
   const rawTemplate = String(args[1] || "").trim().toLowerCase()
-  const knownActors = ["nit", "tag", "lag", "maniac", "calling-station"]
+  const knownActors = ["nit", "tag", "balanced", "tricky", "pressure", "short-stack", "lag", "maniac", "calling-station"]
   const actorTemplate = standalone
     ? (knownActors.includes(rawTemplate) ? rawTemplate : null)
     : await resolveHouseActorTemplate(container, options, rawTemplate)
@@ -614,19 +615,17 @@ async function runNewAgent(container: AGIContainer & any, options: PokerOptions,
     throw new Error(`Target directory already exists: ${rootDir}`)
   }
 
+  const scaffold = createNewAgentScaffold({ slug, displayName, actorTemplate, standalone })
+
   fs.ensureFolder(rootDir)
   fs.ensureFolder(container.paths.resolve(rootDir, "docs"))
   fs.ensureFolder(container.paths.resolve(rootDir, "docs", "situations"))
+  fs.ensureFolder(container.paths.resolve(rootDir, "strategy"))
   fs.ensureFolder(container.paths.resolve(rootDir, "types"))
 
-  await fs.writeFileAsync(container.paths.resolve(rootDir, "README.md"), newAgentReadmeContent({ slug, displayName, actorTemplate, standalone }))
-  await fs.writeFileAsync(container.paths.resolve(rootDir, "strategy.ts"), newAgentStrategyContent({ actorTemplate }))
-  await fs.writeFileAsync(container.paths.resolve(rootDir, "tsconfig.json"), newAgentTsconfigContent())
-  await fs.writeFileAsync(container.paths.resolve(rootDir, "types", "pokurr.d.ts"), newAgentTypesContent())
-  await fs.writeFileAsync(
-    container.paths.resolve(rootDir, "docs", "situations", "README.md"),
-    newAgentSituationNotesContent(displayName),
-  )
+  for (const [relativePath, content] of Object.entries(scaffold.files)) {
+    await fs.writeFileAsync(container.paths.resolve(rootDir, relativePath), content)
+  }
 
   printSection(container, "New Agent Scaffold")
   printKV(ui, "Directory", ui.colors.cyan(rootDir))
@@ -634,7 +633,7 @@ async function runNewAgent(container: AGIContainer & any, options: PokerOptions,
   printKV(ui, "Template", actorTemplate ? ui.colors.green(actorTemplate) : ui.colors.dim("tag"))
   console.log("")
   console.log(ui.colors.dim("  Files created:"))
-  for (const f of ["README.md", "strategy.ts", "tsconfig.json", "types/pokurr.d.ts", "docs/situations/README.md"]) {
+  for (const f of Object.keys(scaffold.files)) {
     console.log(ui.colors.dim(`    ♦ ${f}`))
   }
 }

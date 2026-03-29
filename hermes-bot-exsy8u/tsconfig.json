@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "strategy.ts",
+    "types/**/*.d.ts"
+  ]
+}

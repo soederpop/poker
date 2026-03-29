@@ -1,1 +1,0 @@
-{"situation":"situations/turned-flush-draw","seed":42,"backend":"wasm","iterations":50,"strategy":{"hero":"tight-aggressive","villain":"loose-passive"},"winRates":{"hero":100,"villain":0,"tie":0},"averagePot":73.4,"actionFrequency":{"hero":{"raise":1},"villain":{"call":0.06,"fold":0.94}},"evPerSeat":{"hero":41.4,"villain":-1.08}}

@@ -1,154 +1,57 @@
-# luca-poker
+# Pokurr
 
-`luca-poker` is the modern port of the legacy `pokurr` engine into:
+Pokurr is a local-first poker toolkit with three product pillars:
 
-- TypeScript for public API + range tooling
-- Rust + WASM for high-performance evaluation/equity
-- Luca runnable markdown demos for interactive verification
+1. offline poker analysis
+2. a local bot arena
+3. a self-improving bot research loop
 
-The goal is one shared poker core that supports:
+It is built on:
+- TypeScript for the CLI, runtime, and bot authoring surface
+- Rust + WASM for fast hand evaluation and equity work
+- Luca for source-mode command execution and packaging
 
-- local analysis
-- local simulation
-- future server/tournament modes
+If you only remember one thing: this repo should be useful before you ever touch the research roadmap.
 
-## Workspace Layout
+## Choose your command mode
 
-- `packages/pokurr-core`: TS API (cards, ranges, equity engine boundary)
-- `packages/pokurr-equity`: Rust/WASM evaluator + equity engine
-- `demos/js-api.md`: runnable markdown demo executed in Luca VM
+There are two supported ways to use the project:
 
-## Requirements
-
-- `bun`
-- Rust toolchain (`rustup`, `cargo`)
-- `wasm-pack` on your `PATH` (or the scripts should point to your cargo bin location)
-- `@soederpop/luca` CLI (`npm i -g @soederpop/luca` or install via the project dependencies)
-
-### Installing Rust + wasm-pack
-
-#### macOS
+### Source mode
+Use this while developing inside the repo:
 
 ```bash
-# Install rustup (Rust toolchain manager + cargo)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-
-# Add the WebAssembly compile target
-rustup target add wasm32-unknown-unknown
-
-# Install wasm-pack
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+luca poker ...
 ```
 
-#### Linux (Debian/Ubuntu and similar)
+Examples:
 
 ```bash
-# System deps for building native code
-sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
-
-# Install rustup
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-
-# Add the WebAssembly compile target
-rustup target add wasm32-unknown-unknown
-
-# Install wasm-pack
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+luca poker analyze equity AhKd QsQc
+luca poker serve --port 3000 --seedLobby true
+luca poker new-agent my-bot tag
 ```
 
-After installation, verify everything is in place:
+### Compiled binary mode
+Use this for the standalone CLI experience:
 
 ```bash
-rustc --version
-wasm-pack --version
+pokurr ...
 ```
 
-## Quick Start
-
-From this directory:
+Examples:
 
 ```bash
-cd luca-poker
-bun install
-bun run build:wasm
-bun run test
+pokurr analyze equity AhKd QsQc
+pokurr serve --port 3000 --seedLobby true
+pokurr new-agent my-bot tag
 ```
 
-## Demos
+The command surface is intended to be the same in both modes.
 
-Run the runnable markdown API walkthrough:
+## Fastest ways to get value
 
-```bash
-bun run demo:js-api
-```
-
-This executes [js-api.md](demos/js-api.md) in Luca VM, demonstrates:
-
-- module loading from source
-- cards/deck/range APIs
-- WASM equity path
-- shared markdown VM context behavior
-
-## Core Commands
-
-Build both WASM targets (node + bundler):
-
-```bash
-bun run build:wasm
-```
-
-Run tests (includes WASM cross-check tests):
-
-```bash
-bun run test
-```
-
-## Benchmarking
-
-### Single Scenario
-
-Fast sanity benchmark:
-
-```bash
-bun run --cwd packages/pokurr-core benchmark
-```
-
-### Full Performance Suite
-
-Multi-workload benchmark (equity + range scenarios, speed + drift checks):
-
-```bash
-bun run --cwd packages/pokurr-core benchmark:suite
-```
-
-What the suite reports:
-
-- average JS runtime
-- average WASM runtime
-- per-scenario speedup
-- drift between JS and WASM outcomes (Monte Carlo tolerance)
-- weighted speedup summary
-
-## Performance Baseline (March 2, 2026)
-
-On this workspace after the table-driven evaluator integration:
-
-- weighted suite speedup: ~`217x`
-- equity scenarios: roughly `39x` to `67x`
-- range scenarios: roughly `1900x+`
-
-One flop-board scenario can be faster in JS due to `poker-tools` short-circuit behavior when the board state is highly constrained; this is expected.
-
-## API Boundary Rule
-
-Consumer/app code should use `@pokurr/core` APIs (`equityEngine`, `Range`, etc.).
-Rust internals stay behind `@pokurr/equity` and should remain an implementation detail.
-
-## Plan 2 Bootstrap Commands
-
-From this directory:
+### 1) Offline analysis in 30 seconds
 
 ```bash
 luca poker analyze equity AhKd QsQc --iterations 20000
@@ -156,90 +59,255 @@ luca poker analyze range "ATs+,AJo+" --vs "QQ+,AKs"
 luca poker analyze hand AhQh --board Kh7d2h5h --potSize 42 --toCall 14
 ```
 
-`luca-poker` requires WASM artifacts and will fail fast if they are missing.
+What this gives you:
+- hand-vs-hand equity
+- range-vs-range comparison
+- single-hand study in context
 
-Run deterministic simulation from markdown situations:
+For a fuller study workflow, see `docs/offline-analysis.md`.
 
-```bash
-luca poker sim \
-  --situation situations/turned-flush-draw \
-  --iterations 5000 \
-  --strategy hero=tight-aggressive villain=loose-passive \
-  --seed 42
-```
-
-`sim` results are saved to diskCache under `tmp/poker-cache` with keys prefixed by `poker:sim:`.
-
-## Plan 3 Runtime Notes
-
-For a full local walkthrough (server + seeding + multi-bot run + observability), see [DEMO.md](DEMO.md).
-
-Start server mode with dedicated spectator websocket:
+### 2) Run a local arena
 
 ```bash
-luca poker serve \
-  --port 3000 \
-  --wsPort 3001 \
-  --spectatorPort 3002 \
-  --houseActorsPath house/actors \
-  --actionTimeout 30 \
-  --botThinkDelayMinMs 1200 \
-  --botThinkDelayMaxMs 2600
+luca poker serve --host 127.0.0.1 --port 3000 --seedLobby true
+luca poker register http://127.0.0.1:3000 --name my-bot
+luca poker join ws://127.0.0.1:3001 --token <token> --agent ./my-bot
+luca poker watch ws://127.0.0.1:3002
 ```
 
-Join as an agent with optional manual override:
+What this gives you:
+- a local server
+- live bot play over WebSockets
+- spectator and leaderboard surfaces
+- a tight iteration loop for `strategy.ts`
 
-```bash
-luca poker join ws://localhost:3001 --token <token> --manual
-```
+For the canonical local walkthrough, see `DEMO.md`.
 
-Bot credentials are persisted automatically in a managed block inside `.env` at this project root, and still cached in `tmp/poker-cache`.
-
-Watch a table from terminal spectator mode:
-
-```bash
-luca poker watch ws://localhost:3002 --table <tableId>
-```
-
-Inspect house runtime health/status from CLI:
-
-```bash
-luca poker house status --server http://localhost:3000
-```
-
-House bots are disk-backed actor modules in `house/actors/` (default). Edit those files to tweak showcase bot behavior.
-
-Scaffold a new local agent project:
+### 3) Scaffold a bot and edit one file
 
 ```bash
 luca poker new-agent my-bot tag
+cd my-bot
 ```
 
-This creates `my-bot/` with `README.md`, `container.ts`, `strategy.ts`, and `docs/situations/`.
+Edit:
+- `strategy.ts`
 
-Reset leaderboard baseline (with confirmation prompt, local server-side diskCache mutation):
+Everything else is there to make that single file easier to reason about.
+
+For the onboarding path, see `docs/writing-a-bot.md`.
+
+## Project pillars
+
+### Pillar 1: Offline poker analysis
+
+Core commands:
 
 ```bash
-luca poker leaderboard reset --server http://localhost:3000
+luca poker analyze equity AhKd QsQc
+luca poker analyze range "ATs+,AJo+" --vs "QQ+,AKs"
+luca poker analyze hand AhQh --board Kh7d2h5h --potSize 42 --toCall 14
+luca poker sim --situation docs/situations/turned-flush-draw.md --iterations 5000 --seed 42
 ```
 
-Open product surfaces in browser:
+This is for:
+- reviewing a hand
+- comparing ranges
+- studying board texture and draw structure
+- building reusable situation docs
 
-- `/` (Luca frontend home)
+### Pillar 2: Local bot arena
+
+Core commands:
+
+```bash
+luca poker serve --host 127.0.0.1 --port 3000 --seedLobby true
+luca poker register http://127.0.0.1:3000 --name my-bot
+luca poker join ws://127.0.0.1:3001 --token <token> --agent ./my-bot
+luca poker watch ws://127.0.0.1:3002
+luca poker house status --server http://127.0.0.1:3000
+```
+
+This is for:
+- playing against house bots
+- iterating on your own bot locally
+- running demo nights with spectators and leaderboards
+- validating strategy changes with real runtime behavior
+
+### Pillar 3: Self-improving bot research
+
+This is the long-term differentiator:
+- play a batch of hands
+- bucket decision points
+- estimate regret for legal alternatives
+- write a markdown journal describing leaks
+- update `strategy.ts` in readable code
+- replay and compare
+
+The research docs live here:
+- `docs/regret-minimizer-plan.md`
+- `docs/planning/2026-03-28-regret-minimizer-roadmap.md`
+
+Important: this pillar should sit on top of a polished offline-analysis and local-arena product, not replace them.
+
+## Requirements
+
+- `bun`
+- Rust toolchain (`rustup`, `cargo`)
+- `wasm-pack` on your `PATH`
+- `@soederpop/luca` CLI for source mode (`npm i -g @soederpop/luca`)
+
+### Install Rust + wasm-pack
+
+#### macOS
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup target add wasm32-unknown-unknown
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+```
+
+#### Linux
+
+```bash
+sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup target add wasm32-unknown-unknown
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+```
+
+Verify:
+
+```bash
+rustc --version
+wasm-pack --version
+```
+
+## Local setup
+
+From the repo root:
+
+```bash
+bun install
+bun run build:wasm
+bun run test
+```
+
+## Build the standalone binary
+
+```bash
+bun run compile
+./dist/pokurr analyze equity AhKd QsQc --iterations 5000
+```
+
+The compiled binary embeds the WASM path needed for standalone use.
+
+## Canonical docs
+
+Start here depending on your goal:
+- `docs/offline-analysis.md` — study workflows and reusable situations
+- `docs/writing-a-bot.md` — scaffold, edit, run, debug
+- `DEMO.md` — the canonical local demo/operator flow
+- `docs/hosting-a-server.md` — operator-focused persistent server notes
+- `docs/strategy-globals-api.md` — exhaustive VM global reference
+- `docs/planning/` — roadmap and planning materials
+
+## Workspace layout
+
+- `commands/poker.ts` — main CLI command surface
+- `src/cli.ts` — standalone binary entrypoint
+- `servers/poker-server.ts` — local server runtime
+- `house/actors/` — showcase house bot profiles
+- `packages/pokurr-core` — TypeScript API and range/equity boundary
+- `packages/pokurr-equity` — Rust/WASM evaluator
+- `docs/situations/` — reusable study spots
+- `test/` — runtime and rules coverage
+
+## Core development commands
+
+Build WASM artifacts:
+
+```bash
+bun run build:wasm
+```
+
+Run full tests:
+
+```bash
+bun run test
+```
+
+Run the Luca markdown demo:
+
+```bash
+bun run demo:js-api
+```
+
+Compile the binary:
+
+```bash
+bun run compile
+```
+
+## Benchmarking
+
+Single benchmark:
+
+```bash
+bun run --cwd packages/pokurr-core benchmark
+```
+
+Full performance suite:
+
+```bash
+bun run --cwd packages/pokurr-core benchmark:suite
+```
+
+The suite reports:
+- average JS runtime
+- average WASM runtime
+- per-scenario speedup
+- drift between JS and WASM outcomes
+- weighted speedup summary
+
+## Performance note
+
+Current baseline in this workspace after the table-driven evaluator work:
+- weighted suite speedup: about `217x`
+- equity scenarios: about `39x` to `67x`
+- range scenarios: about `1900x+`
+
+One constrained flop-board scenario can be faster in JS because of `poker-tools` short-circuit behavior. That is expected.
+
+## API boundary rule
+
+Consumer code should prefer `@pokurr/core` APIs such as `equityEngine` and `Range`.
+Rust internals should remain behind `@pokurr/equity`.
+
+## Browser surfaces
+
+When the local server is running, the main surfaces are:
+- `/`
 - `/leaderboard`
 - `/tournaments`
-- `/spectator?tableId=<tableId>` (graphics)
-- `/spectator-debug?tableId=<tableId>` (debug)
-- `/spectator-fixtures` (deterministic golden fixture replay)
+- `/spectator?tableId=<tableId>`
+- `/spectator-debug?tableId=<tableId>`
+- `/spectator-fixtures`
 
-Legacy `/web/*` URLs now redirect to the Luca frontend routes.
+## Status of the product story
 
-Protocol additions:
+Already solid:
+- core game engine legality and tournament mechanics
+- local server runtime
+- house bot ecosystem
+- performance test coverage
 
-- `action_on_you` now includes `timeBankRemaining`
-- `timebank_state` emits turn-start, consumption, and per-hand accrual updates
-- spectators connect on `--spectatorPort` and subscribe with `{ type: "spectate", payload: { tableId } }`
-- golden fixtures are available via `/api/v1/fixtures/golden` and replay payloads via `/api/v1/fixtures/golden/:fixtureId/replay`
-- tournament lobby protocol supports `list_tournaments` and `register_tournament`
+Actively being hardened:
+- docs and first-time-user experience
+- source/binary parity
+- local bot authoring polish
 
-Spectator card policy is `reveal-on-showdown`: no live hole-card leakage; hole cards are only included in `hand_result.showdown` when showdown occurs.
+Next capstone:
+- regret-minimizer journals and strategy iteration loop

@@ -1,14 +1,14 @@
 import { z } from "zod"
 import { FeatureStateSchema, FeatureOptionsSchema } from "@soederpop/luca"
 import { Feature, features } from "@soederpop/luca"
-import type { ContainerContext } from "@soederpop/luca"
 import { Range, equityEngine } from "@pokurr/core"
 
 import { PRNG } from "../lib/prng"
 import { parseExactHand } from "../lib/cards"
+import { STRATEGY_PROFILES, type PokerPosition as StrategyPokerPosition, type StrategyProfile } from "../lib/strategy-profiles"
 
 export type PokerAction = "fold" | "check" | "call" | "bet" | "raise" | "all-in"
-export type PokerPosition = "UTG" | "MP" | "CO" | "BTN" | "SB" | "BB"
+export type PokerPosition = StrategyPokerPosition
 export type EquityBackendPreference = "wasm"
 
 export type DecisionContext = {
@@ -39,13 +39,6 @@ export type StrategyDecision = {
   reasoning?: string
 }
 
-type StrategyProfile = {
-  name: string
-  description: string
-  openRanges: Partial<Record<PokerPosition, string>>
-  llmFallback?: boolean
-}
-
 declare module "@soederpop/luca" {
   interface AvailableFeatures {
     strategy: typeof Strategy
@@ -65,110 +58,7 @@ export const StrategyOptionsSchema = FeatureOptionsSchema.extend({
 
 export type StrategyOptions = z.infer<typeof StrategyOptionsSchema>
 
-const PROFILE_DEFS: Record<string, StrategyProfile> = {
-  "tight-aggressive": {
-    name: "tight-aggressive",
-    description: "Disciplined ranges with high aggression when equity edge is strong.",
-    openRanges: {
-      UTG: "QQ+,AKs,AKo,AQs",
-      MP: "TT+,AQs+,AKo,KQs",
-      CO: "88+,ATs+,KJs+,QJs,AJo+,KQo",
-      BTN: "66+,A8s+,K9s+,QTs+,JTs,ATo+,KJo+,QJo",
-      SB: "77+,A8s+,KTs+,QTs+,JTs,AJo+,KQo",
-      BB: "55+,A5s+,KTs+,QTs+,JTs,AJo+,KQo",
-    },
-  },
-  "loose-passive": {
-    name: "loose-passive",
-    description: "Plays too many hands and leans toward checking and calling.",
-    openRanges: {
-      UTG: "99+,AJs+,KQs,AQo+",
-      MP: "77+,ATs+,KTs+,QTs+,AJo+,KQo",
-      CO: "55+,A5s+,K9s+,Q9s+,J9s+,T9s,A9o+,KTo+,QTo+,JTo",
-      BTN: "22+,A2s+,K5s+,Q8s+,J8s+,T8s+,97s+,86s+,75s+,65s,A2o+,K8o+,Q9o+,J9o+,T9o",
-      SB: "22+,A2s+,K8s+,Q9s+,J9s+,T9s,98s,87s,76s,A8o+,KTo+,QTo+,JTo",
-      BB: "22+,A2s+,K2s+,Q5s+,J7s+,T7s+,97s+,87s,76s,65s,A2o+,K8o+,Q9o+,J9o+,T9o",
-    },
-  },
-  random: {
-    name: "random",
-    description: "Mostly random legal actions with lightweight weighting.",
-    openRanges: {
-      UTG: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-      MP: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-      CO: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-      BTN: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-      SB: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-      BB: "22+,A2s+,K2s+,Q2s+,J2s+,T2s+,92s+,82s+,72s+,62s+,52s+,42s+,32s+,A2o+,K2o+,Q2o+,J2o+,T2o+,92o+,82o+,72o+,62o+,52o+,42o+,32o+",
-    },
-    llmFallback: false,
-  },
-  nit: {
-    name: "nit",
-    description: "Ultra-tight, only plays premium holdings. Folds most hands, rarely bluffs.",
-    openRanges: {
-      UTG: "QQ+,AKs",
-      MP: "JJ+,AKs,AKo",
-      CO: "TT+,AKs,AKo,AQs",
-      BTN: "99+,AQs+,AKo",
-      SB: "TT+,AKs,AKo,AQs",
-      BB: "99+,AQs+,AKo",
-    },
-    llmFallback: false,
-  },
-  tag: {
-    name: "tag",
-    description: "Tight-aggressive: disciplined hand selection with strong aggression on made hands.",
-    openRanges: {
-      UTG: "QQ+,AKs,AKo,AQs",
-      MP: "TT+,AQs+,AKo,KQs",
-      CO: "88+,ATs+,KJs+,QJs,AJo+,KQo",
-      BTN: "66+,A8s+,K9s+,QTs+,JTs,ATo+,KJo+,QJo",
-      SB: "77+,A8s+,KTs+,QTs+,JTs,AJo+,KQo",
-      BB: "55+,A5s+,KTs+,QTs+,JTs,AJo+,KQo",
-    },
-    llmFallback: false,
-  },
-  lag: {
-    name: "lag",
-    description: "Loose-aggressive: wide range selection with frequent bets, raises, and bluffs.",
-    openRanges: {
-      UTG: "77+,ATs+,KJs+,QJs,JTs,AJo+,KQo",
-      MP: "55+,A8s+,K9s+,QTs+,JTs,T9s,ATo+,KJo+,QJo",
-      CO: "33+,A5s+,K7s+,Q9s+,J9s+,T8s+,98s,87s,A8o+,KTo+,QTo+,JTo",
-      BTN: "22+,A2s+,K5s+,Q8s+,J8s+,T8s+,97s+,86s+,76s,65s,A5o+,K9o+,Q9o+,J9o+,T9o",
-      SB: "22+,A2s+,K8s+,Q9s+,J9s+,T9s,98s,87s,76s,A7o+,KTo+,QTo+,JTo",
-      BB: "22+,A2s+,K5s+,Q7s+,J8s+,T7s+,97s+,87s,76s,65s,A5o+,K9o+,Q9o+,J9o+,T9o",
-    },
-    llmFallback: false,
-  },
-  "calling-station": {
-    name: "calling-station",
-    description: "Plays too many hands, rarely raises or folds when facing action. Calls with marginal holdings.",
-    openRanges: {
-      UTG: "99+,AJs+,KQs,AQo+",
-      MP: "77+,ATs+,KTs+,QTs+,AJo+,KQo",
-      CO: "55+,A5s+,K9s+,Q9s+,J9s+,T9s,A9o+,KTo+,QTo+,JTo",
-      BTN: "22+,A2s+,K5s+,Q8s+,J8s+,T8s+,97s+,86s+,75s+,65s,A2o+,K8o+,Q9o+,J9o+,T9o",
-      SB: "22+,A2s+,K8s+,Q9s+,J9s+,T9s,98s,87s,76s,A8o+,KTo+,QTo+,JTo",
-      BB: "22+,A2s+,K2s+,Q5s+,J7s+,T7s+,97s+,87s,76s,65s,A2o+,K8o+,Q9o+,J9o+,T9o",
-    },
-    llmFallback: false,
-  },
-  maniac: {
-    name: "maniac",
-    description: "Hyper-aggressive: bets and raises at every opportunity, wide open ranges, loves action.",
-    openRanges: {
-      UTG: "55+,A5s+,K9s+,QTs+,JTs,T9s,ATo+,KJo+,QJo",
-      MP: "33+,A3s+,K7s+,Q9s+,J9s+,T8s+,98s,87s,A8o+,KTo+,QTo+,JTo",
-      CO: "22+,A2s+,K5s+,Q8s+,J8s+,T7s+,97s+,86s+,76s,65s,A5o+,K9o+,Q9o+,J9o+,T9o",
-      BTN: "22+,A2s+,K2s+,Q5s+,J7s+,T7s+,97s+,86s+,75s+,65s,54s,A2o+,K5o+,Q8o+,J8o+,T8o+,98o",
-      SB: "22+,A2s+,K2s+,Q7s+,J8s+,T7s+,97s+,86s+,76s,65s,A2o+,K8o+,Q9o+,J9o+,T9o",
-      BB: "22+,A2s+,K2s+,Q5s+,J7s+,T7s+,97s+,86s+,76s,65s,54s,A2o+,K5o+,Q8o+,J8o+,T8o+,98o",
-    },
-    llmFallback: false,
-  },
-}
+const PROFILE_DEFS = STRATEGY_PROFILES
 
 export class Strategy extends Feature<StrategyState, StrategyOptions> {
   static override shortcut = "features.strategy" as const
@@ -276,6 +166,22 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
       return this.tightAggressiveDecision(context, rng)
     }
 
+    if (profileName === "balanced") {
+      return this.balancedDecision(context, rng)
+    }
+
+    if (profileName === "tricky") {
+      return this.trickyDecision(context, rng)
+    }
+
+    if (profileName === "pressure") {
+      return this.pressureDecision(context, rng)
+    }
+
+    if (profileName === "short-stack") {
+      return this.shortStackDecision(context, rng)
+    }
+
     if (profileName === "nit") {
       return this.nitDecision(context, rng)
     }
@@ -344,6 +250,146 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     return { action: "check", source: "rules" }
   }
 
+  private balancedDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    if (context.toCall > 0) {
+      if (context.estimatedEquity >= Math.max(context.potOdds + 0.08, 0.52)) {
+        const raiseTo = Math.max(context.toCall * 2.1, Math.round(context.potSize * 0.72))
+        return { action: "raise", amount: raiseTo, source: "rules" }
+      }
+
+      if (context.inPosition && context.estimatedEquity >= context.potOdds - 0.03 && rng.next() < 0.18) {
+        return { action: "call", amount: context.toCall, source: "rules", reasoning: "Balanced float continue" }
+      }
+
+      if (context.estimatedEquity >= Math.max(context.potOdds, 0.31)) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      return { action: "fold", source: "rules" }
+    }
+
+    if (context.estimatedEquity > 0.64) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.7)), source: "rules" }
+    }
+
+    if (context.checkedTo && (context.estimatedEquity > 0.5 || (context.inPosition && rng.next() < 0.28))) {
+      const size = context.estimatedEquity > 0.57 ? 0.58 : 0.45
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * size)), source: "rules" }
+    }
+
+    return { action: "check", source: "rules" }
+  }
+
+  private trickyDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    if (context.toCall > 0) {
+      if (context.estimatedEquity >= 0.72) {
+        if (rng.next() < 0.45) {
+          const raiseTo = Math.max(context.toCall * 2, Math.round(context.potSize * 0.68))
+          return { action: "raise", amount: raiseTo, source: "rules", reasoning: "Trap then spring raise" }
+        }
+        return { action: "call", amount: context.toCall, source: "rules", reasoning: "Disguised strong continue" }
+      }
+
+      if (context.inPosition && context.estimatedEquity >= context.potOdds - 0.02) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      if (context.facingRaise && context.estimatedEquity >= Math.max(context.potOdds + 0.1, 0.5)) {
+        return { action: "call", amount: context.toCall, source: "rules", reasoning: "Tricky defend versus raise" }
+      }
+
+      if (rng.next() < 0.08 && context.toCall < context.effectiveStack * 0.12) {
+        const raiseTo = Math.max(context.toCall * 2.3, Math.round(context.potSize * 0.75))
+        return { action: "raise", amount: raiseTo, source: "rules", reasoning: "Low-frequency tricky bluff raise" }
+      }
+
+      if (context.estimatedEquity >= context.potOdds) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      return { action: "fold", source: "rules" }
+    }
+
+    if (context.estimatedEquity > 0.68 && rng.next() < 0.55) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.72)), source: "rules" }
+    }
+
+    if (context.inPosition && context.checkedTo && context.estimatedEquity > 0.47 && rng.next() < 0.33) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.5)), source: "rules" }
+    }
+
+    if (!context.inPosition && context.checkedTo && context.estimatedEquity > 0.58 && rng.next() < 0.2) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.55)), source: "rules" }
+    }
+
+    return { action: "check", source: "rules" }
+  }
+
+  private pressureDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    if (context.toCall > 0) {
+      if (context.estimatedEquity >= Math.max(context.potOdds + 0.04, 0.44)) {
+        const raiseTo = Math.max(context.toCall * 2.2, Math.round(context.potSize * 0.82))
+        return { action: "raise", amount: raiseTo, source: "rules" }
+      }
+
+      if (context.inPosition && context.estimatedEquity >= context.potOdds - 0.03) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      if (rng.next() < 0.12 && context.toCall < context.effectiveStack * 0.15) {
+        const raiseTo = Math.max(context.toCall * 2.5, Math.round(context.potSize * 0.9))
+        return { action: "raise", amount: raiseTo, source: "rules", reasoning: "Pressure bluff raise" }
+      }
+
+      if (context.estimatedEquity >= context.potOdds) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      return { action: "fold", source: "rules" }
+    }
+
+    if (context.checkedTo && (context.estimatedEquity > 0.4 || rng.next() < 0.38)) {
+      const size = context.estimatedEquity > 0.6 ? 0.8 : 0.55
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * size)), source: "rules" }
+    }
+
+    if (context.estimatedEquity > 0.58) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.68)), source: "rules" }
+    }
+
+    return { action: "check", source: "rules" }
+  }
+
+  private shortStackDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const shallowPressure = context.effectiveStack <= Math.max(context.potSize * 2.5, context.toCall * 5)
+
+    if (context.toCall > 0) {
+      if (shallowPressure && context.estimatedEquity >= Math.max(context.potOdds, 0.42)) {
+        return { action: "all-in", source: "rules", reasoning: "Short-stack leverage jam" }
+      }
+
+      if (context.estimatedEquity >= Math.max(context.potOdds + 0.07, 0.56)) {
+        return { action: "all-in", source: "rules" }
+      }
+
+      if (context.estimatedEquity >= Math.max(context.potOdds, 0.35)) {
+        return { action: "call", amount: context.toCall, source: "rules" }
+      }
+
+      return { action: "fold", source: "rules" }
+    }
+
+    if (shallowPressure && (context.estimatedEquity > 0.54 || rng.next() < 0.18)) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.62)), source: "rules" }
+    }
+
+    if (context.checkedTo && context.estimatedEquity > 0.48 && rng.next() < 0.28) {
+      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.45)), source: "rules" }
+    }
+
+    return { action: "check", source: "rules" }
+  }
+
   private loosePassiveDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
     if (context.toCall > 0) {
       if (context.estimatedEquity >= context.potOdds - 0.03) {
@@ -366,12 +412,10 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
 
   private nitDecision(context: DecisionContext, _rng: PRNG): StrategyDecision {
     if (context.toCall > 0) {
-      // Only continue with strong equity advantage
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.20, 0.65)) {
         return { action: "call", amount: context.toCall, source: "rules" }
       }
 
-      // Very strong hands: slow-raise
       if (context.estimatedEquity >= 0.80) {
         const raiseTo = Math.max(context.toCall * 2, Math.round(context.potSize * 0.75))
         return { action: "raise", amount: raiseTo, source: "rules" }
@@ -380,7 +424,6 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
       return { action: "fold", source: "rules" }
     }
 
-    // Only bet with very strong hands
     if (context.estimatedEquity > 0.72) {
       return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.6)), source: "rules" }
     }
@@ -390,18 +433,15 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
 
   private lagDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
     if (context.toCall > 0) {
-      // Raise with decent equity or as a bluff
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.05, 0.42)) {
         const raiseTo = Math.max(context.toCall * 2, Math.round(context.potSize * 0.75))
         return { action: "raise", amount: raiseTo, source: "rules" }
       }
 
-      // Float call with marginal hands in position
       if (context.inPosition && context.estimatedEquity >= context.potOdds - 0.05) {
         return { action: "call", amount: context.toCall, source: "rules" }
       }
 
-      // Bluff raise sometimes
       if (rng.next() < 0.18 && context.toCall < context.effectiveStack * 0.15) {
         const raiseTo = Math.max(context.toCall * 2.5, Math.round(context.potSize * 0.8))
         return { action: "raise", amount: raiseTo, source: "rules", reasoning: "LAG bluff raise" }
@@ -414,7 +454,6 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
       return { action: "fold", source: "rules" }
     }
 
-    // Bet frequently as aggressor
     if (context.estimatedEquity > 0.45 || rng.next() < 0.35) {
       const size = context.estimatedEquity > 0.6
         ? Math.round(context.potSize * 0.75)
@@ -427,27 +466,22 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
 
   private maniacDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
     if (context.toCall > 0) {
-      // Raise most of the time
       if (rng.next() < 0.55 && context.toCall < context.effectiveStack * 0.4) {
         const raiseTo = Math.max(context.toCall * 2.5, Math.round(context.potSize * 0.9))
         return { action: "raise", amount: raiseTo, source: "rules" }
       }
 
-      // All-in with short-ish stacks or big equity
       if (context.estimatedEquity >= 0.55 || context.effectiveStack <= context.toCall * 2.5) {
         return { action: "all-in", source: "rules" }
       }
 
-      // Still calls light
       if (context.estimatedEquity >= context.potOdds - 0.10) {
         return { action: "call", amount: context.toCall, source: "rules" }
       }
 
-      // Even folds occasionally
       return rng.next() < 0.30 ? { action: "fold", source: "rules" } : { action: "call", amount: context.toCall, source: "rules" }
     }
 
-    // Bet almost always when checked to
     if (rng.next() < 0.80) {
       const size = Math.round(Math.max(context.potSize * 0.8, 1))
       return { action: "bet", amount: size, source: "rules" }

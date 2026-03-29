@@ -1,4 +1,5 @@
 ---
+title: Button Versus Big Blind Top Pair
 stage: flop
 heroCards: AsJd
 board: Jc8h3s

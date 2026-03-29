@@ -84,7 +84,12 @@ function parseFrontmatter(content: string): { meta: Record<string, string>; body
   return { meta, body: match[2] || "" }
 }
 
-function buildSituation(id: string, meta: Record<string, any>): PokerSituation {
+function firstMarkdownHeading(body: string): string | null {
+  const match = String(body || "").match(/^#\s+(.+)$/m)
+  return match ? match[1]!.trim() : null
+}
+
+function buildSituation(id: string, meta: Record<string, any>, body = ""): PokerSituation {
   const stage = String(meta.stage || "").trim() as SituationStage
 
   if (!["preflop", "flop", "turn", "river"].includes(stage)) {
@@ -106,7 +111,7 @@ function buildSituation(id: string, meta: Record<string, any>): PokerSituation {
 
   return {
     id,
-    title: String(meta.title || id),
+    title: String(meta.title || firstMarkdownHeading(body) || id),
     stage,
     heroCards: [heroCards[0] as string, heroCards[1] as string],
     board,
@@ -140,10 +145,10 @@ function loadSituationFromFile(ref: string): PokerSituation {
   }
 
   const content = readFileSync(filePath, "utf-8")
-  const { meta } = parseFrontmatter(content)
+  const { meta, body } = parseFrontmatter(content)
   const id = ref.replace(/\.md$/i, "")
 
-  return buildSituation(id, meta)
+  return buildSituation(id, meta, body)
 }
 
 export async function loadSituation(container: AGIContainer, ref: string): Promise<PokerSituation> {
