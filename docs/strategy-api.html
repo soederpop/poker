@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokurr Strategy Context API</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--border-hover:#484f58;
+    --text:#e6edf3;--muted:#8b949e;--blue:#58a6ff;--green:#3fb950;
+    --orange:#d29922;--purple:#bc8cff;--pink:#f778ba;--cyan:#79c0ff;
+    --mono:"SF Mono","Cascadia Code","Fira Code","JetBrains Mono",Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --radius:8px;
+  }
+  html{scroll-behavior:smooth;scroll-padding-top:64px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;font-size:16px}
+  a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+
+  /* Layout */
+  .container{max-width:960px;margin:0 auto;padding:0 24px}
+  section{padding:48px 0}
+  h2{font-size:1.75rem;margin-bottom:8px;color:var(--text)}
+  h3{font-size:1.25rem;margin:24px 0 8px;color:var(--text)}
+  p{color:var(--muted);margin-bottom:12px}
+
+  /* Hero */
+  .hero{text-align:center;padding:80px 0 48px}
+  .hero h1{font-size:2.5rem;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero .subtitle{font-size:1.1rem;color:var(--muted);margin:12px 0 24px;font-family:var(--mono);font-size:0.95rem}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;font-family:var(--mono);letter-spacing:0.5px}
+  .badge-sync{background:#3fb95020;color:var(--green);border:1px solid #3fb95040}
+  .badge-async{background:#d2992220;color:var(--orange);border:1px solid #d2992240}
+  .badge-class{background:#bc8cff20;color:var(--purple);border:1px solid #bc8cff40}
+  .badge-type{background:#58a6ff20;color:var(--blue);border:1px solid #58a6ff40}
+
+  /* Sticky nav */
+  .sticky-nav{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .sticky-nav .container{display:flex;gap:4px;overflow-x:auto;padding-top:12px;padding-bottom:12px;scrollbar-width:none}
+  .sticky-nav .container::-webkit-scrollbar{display:none}
+  .sticky-nav a{color:var(--muted);font-size:0.8rem;font-family:var(--mono);white-space:nowrap;padding:4px 10px;border-radius:6px;transition:all .15s}
+  .sticky-nav a:hover,.sticky-nav a:focus{color:var(--text);background:#ffffff08;text-decoration:none}
+
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin:16px 0;transition:border-color .2s}
+  .card:hover{border-color:var(--border-hover)}
+
+  /* Code blocks */
+  pre{background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;overflow-x:auto;font-family:var(--mono);font-size:0.85rem;line-height:1.7;margin:12px 0;color:var(--text)}
+  code{font-family:var(--mono);font-size:0.85em}
+  p code,li code{background:#ffffff10;padding:2px 6px;border-radius:4px;color:var(--cyan)}
+
+  /* Syntax highlighting */
+  .kw{color:var(--pink)}.ty{color:var(--cyan)}.str{color:#a5d6ff}.num{color:var(--cyan)}
+  .cm{color:var(--muted);font-style:italic}.fn{color:var(--purple)}.prop{color:var(--text)}
+  .op{color:var(--text)}
+
+  /* Details / collapsible */
+  details{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;transition:border-color .2s}
+  details:hover{border-color:var(--border-hover)}
+  details summary{padding:12px 20px;cursor:pointer;font-family:var(--mono);font-size:0.9rem;color:var(--blue);user-select:none;list-style:none}
+  details summary::before{content:"▸ ";color:var(--muted)}
+  details[open] summary::before{content:"▾ "}
+  details pre{border:none;border-top:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);margin:0}
+
+  /* Signature block */
+  .sig{font-family:var(--mono);font-size:0.9rem;padding:8px 16px;background:#0d1117;border:1px solid var(--border);border-radius:var(--radius);margin:8px 0 4px;display:inline-block}
+
+  /* Profile grid */
+  .profile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin:16px 0}
+  .profile-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:border-color .2s}
+  .profile-card:hover{border-color:var(--border-hover)}
+  .profile-card h4{margin:0 0 4px;font-size:1rem}
+  .profile-card .desc{font-size:0.8rem;color:var(--muted);margin-bottom:12px}
+  .stat-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:0.75rem;font-family:var(--mono)}
+  .stat-label{width:90px;color:var(--muted);flex-shrink:0}
+  .stat-bar{flex:1;height:6px;background:#ffffff10;border-radius:3px;overflow:hidden}
+  .stat-fill{height:100%;border-radius:3px;transition:width .3s}
+  .stat-val{width:36px;text-align:right;color:var(--text);flex-shrink:0}
+  .draw-tag{display:inline-block;font-size:0.7rem;padding:2px 8px;border-radius:10px;font-family:var(--mono);margin-top:6px}
+  .draw-passive{background:#3fb95015;color:var(--green);border:1px solid #3fb95030}
+  .draw-standard{background:#58a6ff15;color:var(--blue);border:1px solid #58a6ff30}
+  .draw-aggressive{background:#d2992215;color:var(--orange);border:1px solid #d2992230}
+  .draw-hyper{background:#f778ba15;color:var(--pink);border:1px solid #f778ba30}
+
+  /* Section divider */
+  .divider{border:none;border-top:1px solid var(--border);margin:0}
+
+  /* Footer */
+  footer{text-align:center;padding:48px 0;color:var(--muted);font-family:var(--mono);font-size:0.85rem;border-top:1px solid var(--border)}
+  footer code{color:var(--blue)}
+
+  /* Responsive */
+  @media(max-width:700px){
+    .hero h1{font-size:1.75rem}
+    .profile-grid{grid-template-columns:1fr}
+    section{padding:32px 0}
+    pre{font-size:0.78rem;padding:12px 14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="container">
+    <h1>Pokurr Strategy Context API</h1>
+    <p class="subtitle">Everything injected into your strategy.ts VM — no imports needed.</p>
+    <div class="badges">
+      <span class="badge badge-sync">sync</span>
+      <span class="badge badge-async">async</span>
+      <span class="badge badge-class">class</span>
+      <span class="badge badge-type">type</span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ STICKY NAV ============ -->
+<nav class="sticky-nav">
+  <div class="container">
+    <a href="#context">Context</a>
+    <a href="#hand-eval">Hand Eval</a>
+    <a href="#equity">Equity</a>
+    <a href="#ranges">Ranges</a>
+    <a href="#board-draws">Board &amp; Draws</a>
+    <a href="#strategy">Strategy</a>
+    <a href="#cards">Cards</a>
+    <a href="#profiles">Profiles</a>
+    <a href="#opponent-model">Opponent Model</a>
+  </div>
+</nav>
+
+<!-- ============ DECISION CONTEXT ============ -->
+<section id="context">
+  <div class="container">
+    <h2>Decision Context <span class="badge badge-type">type</span></h2>
+    <p>The <code>context</code> object passed to your strategy function every decision point. All fields are read-only.</p>
+
+    <div class="card">
+<pre><span class="kw">type</span> <span class="ty">DecisionContext</span> = {
+  <span class="cm">// Your hand</span>
+  <span class="prop">heroCards</span>: [<span class="ty">string</span>, <span class="ty">string</span>]        <span class="cm">// ["Ah", "Kd"]</span>
+  <span class="prop">board</span>: <span class="ty">string</span>[]                    <span class="cm">// ["Ks", "7d", "2h"]</span>
+  <span class="prop">street</span>: <span class="str">"preflop"</span> | <span class="str">"flop"</span> | <span class="str">"turn"</span> | <span class="str">"river"</span>
+  <span class="prop">position</span>: <span class="str">"UTG"</span> | <span class="str">"MP"</span> | <span class="str">"CO"</span> | <span class="str">"BTN"</span> | <span class="str">"SB"</span> | <span class="str">"BB"</span>
+  <span class="prop">inPosition</span>: <span class="ty">boolean</span>
+
+  <span class="cm">// Pot &amp; betting</span>
+  <span class="prop">toCall</span>: <span class="ty">number</span>                     <span class="cm">// chips to call (0 if checked to)</span>
+  <span class="prop">potSize</span>: <span class="ty">number</span>
+  <span class="prop">effectiveStack</span>: <span class="ty">number</span>             <span class="cm">// your remaining chips</span>
+  <span class="prop">legalActions</span>: <span class="ty">PokerAction</span>[]
+  <span class="prop">playersInHand</span>: <span class="ty">number</span>
+  <span class="prop">playersLeftToAct</span>: <span class="ty">number</span>
+
+  <span class="cm">// Board analysis (auto-computed, null on preflop)</span>
+  <span class="prop">boardTexture</span>: <span class="ty">BoardTexture</span> | <span class="kw">null</span>
+  <span class="prop">draws</span>: <span class="ty">DrawAnalysis</span> | <span class="kw">null</span>
+
+  <span class="cm">// Action context</span>
+  <span class="prop">facingBet</span>: <span class="ty">boolean</span>
+  <span class="prop">facingRaise</span>: <span class="ty">boolean</span>               <span class="cm">// raise count &gt;= 1</span>
+  <span class="prop">facingThreeBet</span>: <span class="ty">boolean</span>            <span class="cm">// raise count &gt;= 2</span>
+  <span class="prop">raiseCount</span>: <span class="ty">number</span>                 <span class="cm">// raises this street</span>
+  <span class="prop">checkedTo</span>: <span class="ty">boolean</span>
+  <span class="prop">isAggressor</span>: <span class="ty">boolean</span>               <span class="cm">// hero made last raise</span>
+  <span class="prop">aggressor</span>: <span class="ty">string</span> | <span class="kw">null</span>           <span class="cm">// playerId of last raiser</span>
+  <span class="prop">streetHistory</span>: <span class="ty">Array</span>&lt;{ <span class="prop">playerId</span>: <span class="ty">string</span>; <span class="prop">action</span>: <span class="ty">string</span>; <span class="prop">amount</span>?: <span class="ty">number</span> }&gt;
+  <span class="prop">spr</span>: <span class="ty">number</span>                        <span class="cm">// stack-to-pot ratio</span>
+  <span class="prop">streetIndex</span>: <span class="ty">number</span>                <span class="cm">// 0=pre, 1=flop, 2=turn, 3=river</span>
+
+  <span class="cm">// Opponent profiles (HUD-style stats from all hands at this table)</span>
+  <span class="prop">villainProfiles</span>: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">VillainProfile</span>&gt;  <span class="cm">// every player, keyed by playerId</span>
+  <span class="prop">villainProfile</span>: <span class="ty">VillainProfile</span> | <span class="kw">null</span>             <span class="cm">// primary opponent</span>
+
+  <span class="cm">// Equity (pre-computed)</span>
+  <span class="prop">estimatedEquity</span>: <span class="ty">number</span>            <span class="cm">// 0–1</span>
+  <span class="prop">potOdds</span>: <span class="ty">number</span>                    <span class="cm">// 0–1</span>
+}</pre>
+    </div>
+
+    <h3>StrategyDecision <span class="badge badge-type">type</span></h3>
+    <p>What your strategy function must return.</p>
+    <div class="card">
+<pre><span class="kw">type</span> <span class="ty">StrategyDecision</span> = {
+  <span class="prop">action</span>: <span class="str">"fold"</span> | <span class="str">"check"</span> | <span class="str">"call"</span> | <span class="str">"bet"</span> | <span class="str">"raise"</span> | <span class="str">"all-in"</span>
+  <span class="prop">amount</span>?: <span class="ty">number</span>       <span class="cm">// required for bet/raise</span>
+  <span class="prop">reason</span>?: <span class="ty">string</span>       <span class="cm">// logged for debugging</span>
+}</pre>
+    </div>
+
+    <h3>Minimal Example</h3>
+<pre><span class="kw">export default</span> <span class="kw">function</span> <span class="fn">decide</span>(<span class="prop">context</span>: <span class="ty">DecisionContext</span>): <span class="ty">StrategyDecision</span> {
+  <span class="kw">if</span> (context.<span class="prop">estimatedEquity</span> &gt; context.<span class="prop">potOdds</span>) {
+    <span class="kw">return</span> { <span class="prop">action</span>: <span class="str">"call"</span>, <span class="prop">reason</span>: <span class="str">"pot odds"</span> }
+  }
+  <span class="kw">return</span> { <span class="prop">action</span>: <span class="str">"fold"</span> }
+}</pre>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ HAND EVALUATION ============ -->
+<section id="hand-eval">
+  <div class="container">
+    <h2>Hand Evaluation <span class="badge badge-sync">sync</span></h2>
+    <p>Evaluate made hands, compare showdown strength, and normalize combo strings.</p>
+
+    <h3><code class="fn">evaluateHand</code>(cards: string[]): HandResult</h3>
+    <p>Takes 5–7 cards, returns the best 5-card hand.</p>
+<pre><span class="kw">const</span> result = <span class="fn">evaluateHand</span>([<span class="str">"Ah"</span>, <span class="str">"Kh"</span>, <span class="str">"Qh"</span>, <span class="str">"Jh"</span>, <span class="str">"Th"</span>])
+<span class="cm">// result.rank     → "royal-flush"</span>
+<span class="cm">// result.value    → numeric strength (higher = better)</span>
+<span class="cm">// result.name     → "Royal Flush"</span>
+<span class="cm">// result.cards    → best 5 cards used</span></pre>
+
+    <h3><code class="fn">compareHands</code>(a: string[], b: string[]): -1 | 0 | 1</h3>
+    <p>Returns <code>1</code> if hand <code>a</code> wins, <code>-1</code> if hand <code>b</code> wins, <code>0</code> for a tie.</p>
+<pre><span class="kw">const</span> winner = <span class="fn">compareHands</span>(
+  [<span class="str">"Ah"</span>, <span class="str">"Kh"</span>, <span class="str">"Qs"</span>, <span class="str">"Jd"</span>, <span class="str">"Tc"</span>],
+  [<span class="str">"9s"</span>, <span class="str">"9d"</span>, <span class="str">"9h"</span>, <span class="str">"5c"</span>, <span class="str">"2d"</span>]
+)
+<span class="cm">// winner → 1 (straight beats trips)</span></pre>
+
+    <h3><code class="fn">normalizeCombo</code>(combo: string): string</h3>
+    <p>Normalizes a 2-card combo to canonical form: pairs → <code>"AA"</code>, suited → <code>"AKs"</code>, offsuit → <code>"AKo"</code>.</p>
+<pre><span class="fn">normalizeCombo</span>(<span class="str">"KhAh"</span>)  <span class="cm">// → "AKs"</span>
+<span class="fn">normalizeCombo</span>(<span class="str">"9d9c"</span>)  <span class="cm">// → "99"</span></pre>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ EQUITY ============ -->
+<section id="equity">
+  <div class="container">
+    <h2>Equity <span class="badge badge-sync">sync</span> <span class="badge badge-async">async</span></h2>
+    <p>Calculate hand equity against ranges. <strong>Note:</strong> equity functions return <code>0–100</code>, not <code>0–1</code>.</p>
+
+    <h3><code class="fn">equity</code>(hand, range, board?): HandEquity <span class="badge badge-sync">sync</span></h3>
+    <p>Quick equity estimate for a hand vs a range on a given board.</p>
+<pre><span class="kw">const</span> eq = <span class="fn">equity</span>([<span class="str">"Ah"</span>, <span class="str">"Kh"</span>], <span class="str">"AA,KK,QQ,AKs"</span>, [<span class="str">"Ks"</span>, <span class="str">"7d"</span>, <span class="str">"2h"</span>])
+<span class="cm">// eq.equity   → 42.3  (percent, 0-100)</span>
+<span class="cm">// eq.win      → 39.1</span>
+<span class="cm">// eq.tie      → 3.2</span>
+<span class="cm">// eq.lose     → 57.7</span></pre>
+
+    <h3><code class="fn">equityEngine</code> <span class="badge badge-async">async</span></h3>
+    <p>Full Monte-Carlo engine for deeper simulations.</p>
+<pre><span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">equityEngine</span>.<span class="fn">calculate</span>({
+  <span class="prop">hand</span>: [<span class="str">"Ah"</span>, <span class="str">"Kh"</span>],
+  <span class="prop">range</span>: <span class="str">"random"</span>,
+  <span class="prop">board</span>: [],
+  <span class="prop">iterations</span>: <span class="num">10000</span>
+})</pre>
+
+    <h3><code class="fn">compareRanges</code>(rangeA, rangeB, board?): RangeEquity <span class="badge badge-async">async</span></h3>
+    <p>Compare two ranges against each other. Returns equity for each side.</p>
+<pre><span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">compareRanges</span>(
+  <span class="str">"AA,KK,QQ"</span>,
+  <span class="str">"JTs,T9s,98s"</span>,
+  [<span class="str">"Jh"</span>, <span class="str">"Tc"</span>, <span class="str">"4d"</span>]
+)
+<span class="cm">// result.equityA → 61.2  (percent)</span>
+<span class="cm">// result.equityB → 38.8</span></pre>
+
+    <details>
+      <summary>HandEquity &amp; RangeEquity types</summary>
+<pre><span class="kw">class</span> <span class="ty">HandEquity</span> {
+  <span class="prop">equity</span>: <span class="ty">number</span>     <span class="cm">// 0-100</span>
+  <span class="prop">win</span>: <span class="ty">number</span>        <span class="cm">// 0-100</span>
+  <span class="prop">tie</span>: <span class="ty">number</span>        <span class="cm">// 0-100</span>
+  <span class="prop">lose</span>: <span class="ty">number</span>       <span class="cm">// 0-100</span>
+}
+
+<span class="kw">class</span> <span class="ty">RangeEquity</span> {
+  <span class="prop">equityA</span>: <span class="ty">number</span>   <span class="cm">// 0-100</span>
+  <span class="prop">equityB</span>: <span class="ty">number</span>   <span class="cm">// 0-100</span>
+  <span class="prop">wins</span>: <span class="ty">number</span>
+  <span class="prop">ties</span>: <span class="ty">number</span>
+  <span class="prop">samples</span>: <span class="ty">number</span>
+}</pre>
+    </details>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ RANGES ============ -->
+<section id="ranges">
+  <div class="container">
+    <h2>Ranges <span class="badge badge-class">class</span></h2>
+    <p>Build, filter, and compare hand ranges.</p>
+
+    <h3>Constructor</h3>
+<pre><span class="kw">const</span> range = <span class="kw">new</span> <span class="ty">Range</span>(<span class="str">"AA,KK,QQ,AKs,AKo"</span>)
+<span class="kw">const</span> range2 = <span class="kw">new</span> <span class="ty">Range</span>([<span class="str">"AA"</span>, <span class="str">"KK"</span>, <span class="str">"QQ"</span>])</pre>
+
+    <h3>Properties</h3>
+    <div class="card">
+<pre><span class="prop">range</span>.<span class="prop">size</span>                  <span class="cm">// number of combos</span>
+<span class="prop">range</span>.<span class="prop">percentile</span>            <span class="cm">// 0-1, how tight (lower = tighter)</span>
+<span class="prop">range</span>.<span class="prop">strength</span>              <span class="cm">// 0-1, average hand strength</span>
+<span class="prop">range</span>.<span class="prop">comboNames</span>            <span class="cm">// ["AhAs", "AhAd", ...] raw combos</span>
+<span class="prop">range</span>.<span class="prop">normalizedComboNames</span>  <span class="cm">// ["AA", "AKs", ...] canonical</span></pre>
+    </div>
+
+    <h3>Methods</h3>
+<pre><span class="prop">range</span>.<span class="fn">includes</span>(<span class="str">"AKs"</span>)          <span class="cm">// → boolean</span>
+<span class="prop">range</span>.<span class="fn">include</span>(<span class="str">"JTs"</span>)           <span class="cm">// add combos, returns new Range</span>
+<span class="prop">range</span>.<span class="fn">exclude</span>(<span class="str">"72o"</span>)           <span class="cm">// remove combos, returns new Range</span>
+<span class="prop">range</span>.<span class="fn">compare</span>(otherRange)       <span class="cm">// overlap analysis</span></pre>
+
+    <h3>Static Presets</h3>
+<pre><span class="ty">Range</span>.<span class="fn">ultraStrong</span>()    <span class="cm">// AA, KK</span>
+<span class="ty">Range</span>.<span class="fn">strong</span>()         <span class="cm">// AA-TT, AKs-AJs, AKo</span>
+<span class="ty">Range</span>.<span class="fn">medium</span>()         <span class="cm">// ~top 20% of hands</span>
+<span class="ty">Range</span>.<span class="fn">loose</span>()          <span class="cm">// ~top 40% of hands</span>
+<span class="ty">Range</span>.<span class="fn">sklansky</span>(<span class="num">1</span>)      <span class="cm">// Sklansky group 1-8</span>
+<span class="ty">Range</span>.<span class="fn">strongestHands</span>(<span class="num">10</span>) <span class="cm">// top N combos by strength</span>
+<span class="ty">Range</span>.<span class="fn">filterCombos</span>(<span class="prop">fn</span>)  <span class="cm">// custom filter function</span></pre>
+
+    <h3>Example: 3-bet bluff range</h3>
+<pre><span class="kw">const</span> bluffRange = <span class="ty">Range</span>.<span class="fn">medium</span>()
+  .<span class="fn">exclude</span>(<span class="str">"AA,KK,QQ,AKs"</span>)     <span class="cm">// remove value hands</span>
+  .<span class="fn">include</span>(<span class="str">"A5s,A4s"</span>)           <span class="cm">// add suited wheel aces</span>
+
+<span class="kw">if</span> (bluffRange.<span class="fn">includes</span>(<span class="fn">normalizeCombo</span>(context.<span class="prop">heroCards</span>.<span class="fn">join</span>(<span class="str">""</span>)))) {
+  <span class="kw">return</span> { <span class="prop">action</span>: <span class="str">"raise"</span>, <span class="prop">amount</span>: context.<span class="prop">potSize</span> * <span class="num">3</span> }
+}</pre>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ BOARD & DRAWS ============ -->
+<section id="board-draws">
+  <div class="container">
+    <h2>Board &amp; Draws <span class="badge badge-sync">sync</span></h2>
+    <p>Analyze board texture and draw possibilities. Both are auto-populated on <code>context</code> but you can call them manually on any board.</p>
+
+    <h3><code class="fn">analyzeBoard</code>(board: string[]): BoardTexture</h3>
+<pre><span class="kw">const</span> texture = <span class="fn">analyzeBoard</span>([<span class="str">"Ks"</span>, <span class="str">"Qh"</span>, <span class="str">"Jd"</span>])
+<span class="cm">// texture.isMonotone    → false</span>
+<span class="cm">// texture.isConnected   → true</span>
+<span class="cm">// texture.highCard      → "K"</span>
+<span class="cm">// texture.pairOnBoard   → false</span></pre>
+
+    <details>
+      <summary>BoardTexture — full type (17 fields)</summary>
+<pre><span class="kw">type</span> <span class="ty">BoardTexture</span> = {
+  <span class="prop">highCard</span>: <span class="ty">string</span>           <span class="cm">// "A", "K", etc.</span>
+  <span class="prop">isMonotone</span>: <span class="ty">boolean</span>        <span class="cm">// all one suit</span>
+  <span class="prop">isTwoTone</span>: <span class="ty">boolean</span>         <span class="cm">// exactly 2 suits</span>
+  <span class="prop">isRainbow</span>: <span class="ty">boolean</span>         <span class="cm">// all different suits</span>
+  <span class="prop">isConnected</span>: <span class="ty">boolean</span>       <span class="cm">// 3+ connected cards</span>
+  <span class="prop">isPaired</span>: <span class="ty">boolean</span>          <span class="cm">// board has a pair</span>
+  <span class="prop">pairOnBoard</span>: <span class="ty">boolean</span>       <span class="cm">// alias for isPaired</span>
+  <span class="prop">isTrips</span>: <span class="ty">boolean</span>           <span class="cm">// board has trips</span>
+  <span class="prop">flushPossible</span>: <span class="ty">boolean</span>     <span class="cm">// 3+ of one suit</span>
+  <span class="prop">straightPossible</span>: <span class="ty">boolean</span>  <span class="cm">// 3+ connected</span>
+  <span class="prop">suitCounts</span>: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">number</span>&gt;
+  <span class="prop">rankCounts</span>: <span class="ty">Record</span>&lt;<span class="ty">string</span>, <span class="ty">number</span>&gt;
+  <span class="prop">gaps</span>: <span class="ty">number</span>[]             <span class="cm">// gaps between ranks</span>
+  <span class="prop">maxSuitCount</span>: <span class="ty">number</span>
+  <span class="prop">isHighBoard</span>: <span class="ty">boolean</span>       <span class="cm">// 2+ broadway cards</span>
+  <span class="prop">isLowBoard</span>: <span class="ty">boolean</span>        <span class="cm">// all cards 8 or below</span>
+  <span class="prop">isDry</span>: <span class="ty">boolean</span>             <span class="cm">// rainbow, unconnected, unpaired</span>
+}</pre>
+    </details>
+
+    <h3 style="margin-top:24px"><code class="fn">analyzeDraws</code>(heroCards, board): DrawAnalysis</h3>
+<pre><span class="kw">const</span> draws = <span class="fn">analyzeDraws</span>([<span class="str">"Ah"</span>, <span class="str">"Th"</span>], [<span class="str">"Kh"</span>, <span class="str">"7h"</span>, <span class="str">"2d"</span>])
+<span class="cm">// draws.hasFlushDraw       → true</span>
+<span class="cm">// draws.hasNutFlushDraw    → true</span>
+<span class="cm">// draws.flushOuts          → 9</span>
+<span class="cm">// draws.totalOuts          → 9</span></pre>
+
+    <details>
+      <summary>DrawAnalysis — full type (13 fields)</summary>
+<pre><span class="kw">type</span> <span class="ty">DrawAnalysis</span> = {
+  <span class="prop">hasFlushDraw</span>: <span class="ty">boolean</span>
+  <span class="prop">hasNutFlushDraw</span>: <span class="ty">boolean</span>
+  <span class="prop">hasOpenEndedStraightDraw</span>: <span class="ty">boolean</span>
+  <span class="prop">hasGutshot</span>: <span class="ty">boolean</span>
+  <span class="prop">hasOvercards</span>: <span class="ty">boolean</span>
+  <span class="prop">hasBackdoorFlush</span>: <span class="ty">boolean</span>
+  <span class="prop">hasBackdoorStraight</span>: <span class="ty">boolean</span>
+  <span class="prop">flushOuts</span>: <span class="ty">number</span>
+  <span class="prop">straightOuts</span>: <span class="ty">number</span>
+  <span class="prop">totalOuts</span>: <span class="ty">number</span>
+  <span class="prop">comboDraws</span>: <span class="ty">boolean</span>         <span class="cm">// flush + straight draw</span>
+  <span class="prop">drawStrength</span>: <span class="str">"none"</span> | <span class="str">"weak"</span> | <span class="str">"medium"</span> | <span class="str">"strong"</span> | <span class="str">"monster"</span>
+  <span class="prop">outsList</span>: <span class="ty">string</span>[]          <span class="cm">// specific out cards</span>
+}</pre>
+    </details>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ STRATEGY ============ -->
+<section id="strategy">
+  <div class="container">
+    <h2>Strategy Helpers</h2>
+    <p>Higher-level helpers available on the <code>strategy</code> global.</p>
+
+    <h3><code>strategy.<span class="fn">estimateEquity</span></code>(hand, range, board) <span class="badge badge-async">async</span></h3>
+    <p>Convenience wrapper around the equity engine with sensible defaults.</p>
+<pre><span class="kw">const</span> eq = <span class="kw">await</span> strategy.<span class="fn">estimateEquity</span>(
+  context.<span class="prop">heroCards</span>,
+  <span class="str">"random"</span>,
+  context.<span class="prop">board</span>
+)
+<span class="cm">// eq → 62.5 (percent)</span></pre>
+
+    <h3><code>strategy.<span class="fn">rangeForProfile</span></code>(profileName, street) <span class="badge badge-sync">sync</span></h3>
+    <p>Returns the default open/call range for a built-in profile.</p>
+<pre><span class="kw">const</span> nitRange = strategy.<span class="fn">rangeForProfile</span>(<span class="str">"nit"</span>, <span class="str">"preflop"</span>)
+<span class="cm">// nitRange → Range (AA, KK, QQ, AKs)</span></pre>
+
+    <h3><code>strategy.<span class="fn">listProfiles</span></code>() <span class="badge badge-sync">sync</span></h3>
+    <p>Returns an array of all available profile names.</p>
+<pre>strategy.<span class="fn">listProfiles</span>()
+<span class="cm">// → ["nit", "tag", "balanced", "tricky", "pressure", "lag", "maniac",</span>
+<span class="cm">//    "short-stack", "calling-station", "loose-passive", "random"]</span></pre>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ CARDS ============ -->
+<section id="cards">
+  <div class="container">
+    <h2>Cards <span class="badge badge-class">class</span> <span class="badge badge-sync">sync</span></h2>
+    <p>Deck manipulation and card conversion utilities.</p>
+
+    <h3>Deck Class</h3>
+<pre><span class="kw">const</span> deck = <span class="kw">new</span> <span class="ty">Deck</span>()
+deck.<span class="fn">shuffle</span>()               <span class="cm">// randomize in place</span>
+deck.<span class="fn">draw</span>()                 <span class="cm">// → "Ah" (single card string)</span>
+deck.<span class="fn">draw_n</span>(<span class="num">5</span>)              <span class="cm">// → ["Kd", "Qs", "Jh", "Tc", "9d"]</span>
+deck.<span class="fn">reset</span>()                <span class="cm">// restore all 52 cards</span></pre>
+
+    <h3>Conversion Helpers</h3>
+<pre><span class="fn">stringToCard</span>(<span class="str">"Ah"</span>)   <span class="cm">// → { rank: "A", suit: "h", value: 14 }</span>
+<span class="fn">cardToString</span>({ <span class="prop">rank</span>: <span class="str">"A"</span>, <span class="prop">suit</span>: <span class="str">"h"</span> })  <span class="cm">// → "Ah"</span></pre>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ PROFILES ============ -->
+<section id="profiles">
+  <div class="container">
+    <h2>Built-in Profiles</h2>
+    <p>11 pre-configured opponent archetypes. Use with <code>strategy.rangeForProfile()</code> or as reference for hand-reading.</p>
+
+    <div class="profile-grid">
+
+      <!-- nit -->
+      <div class="profile-card">
+        <h4 style="color:var(--cyan)">nit</h4>
+        <div class="desc">Ultra-tight. Only premiums. Never bluffs.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:40%;background:var(--green)"></div></div><span class="stat-val">40%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:20%;background:var(--orange)"></div></div><span class="stat-val">0.20</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:5%;background:var(--blue)"></div></div><span class="stat-val">5%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:30%;background:var(--purple)"></div></div><span class="stat-val">30%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:5%;background:var(--pink)"></div></div><span class="stat-val">5%</span></div>
+        <span class="draw-tag draw-passive">passive draws</span>
+      </div>
+
+      <!-- tag -->
+      <div class="profile-card">
+        <h4 style="color:var(--green)">tag</h4>
+        <div class="desc">Disciplined ranges, high aggression on strong hands.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:65%;background:var(--green)"></div></div><span class="stat-val">65%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:33%;background:var(--orange)"></div></div><span class="stat-val">0.33</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:12%;background:var(--blue)"></div></div><span class="stat-val">12%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:55%;background:var(--purple)"></div></div><span class="stat-val">55%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:18%;background:var(--pink)"></div></div><span class="stat-val">18%</span></div>
+        <span class="draw-tag draw-standard">standard draws</span>
+      </div>
+
+      <!-- balanced -->
+      <div class="profile-card">
+        <h4 style="color:var(--blue)">balanced</h4>
+        <div class="desc">All-around solid. Mixes pressure with disciplined defense.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:60%;background:var(--green)"></div></div><span class="stat-val">60%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--orange)"></div></div><span class="stat-val">0.50</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:18%;background:var(--blue)"></div></div><span class="stat-val">18%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--purple)"></div></div><span class="stat-val">50%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:25%;background:var(--pink)"></div></div><span class="stat-val">25%</span></div>
+        <span class="draw-tag draw-standard">standard draws</span>
+      </div>
+
+      <!-- tricky -->
+      <div class="profile-card">
+        <h4 style="color:var(--purple)">tricky</h4>
+        <div class="desc">Deception-heavy. Flats IP, delayed aggression, hard to read.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--green)"></div></div><span class="stat-val">50%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--orange)"></div></div><span class="stat-val">0.50</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:25%;background:var(--blue)"></div></div><span class="stat-val">25%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:40%;background:var(--purple)"></div></div><span class="stat-val">40%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:20%;background:var(--pink)"></div></div><span class="stat-val">20%</span></div>
+        <span class="draw-tag draw-standard">standard draws</span>
+      </div>
+
+      <!-- pressure -->
+      <div class="profile-card">
+        <h4 style="color:var(--orange)">pressure</h4>
+        <div class="desc">Relentless aggression. Forces honest defense.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:75%;background:var(--green)"></div></div><span class="stat-val">75%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:67%;background:var(--orange)"></div></div><span class="stat-val">0.67</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:15%;background:var(--blue)"></div></div><span class="stat-val">15%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:65%;background:var(--purple)"></div></div><span class="stat-val">65%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:35%;background:var(--pink)"></div></div><span class="stat-val">35%</span></div>
+        <span class="draw-tag draw-aggressive">aggressive draws</span>
+      </div>
+
+      <!-- lag -->
+      <div class="profile-card">
+        <h4 style="color:var(--orange)">lag</h4>
+        <div class="desc">Loose-aggressive. Wide opens, frequent bets and bluffs.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:70%;background:var(--green)"></div></div><span class="stat-val">70%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:67%;background:var(--orange)"></div></div><span class="stat-val">0.67</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:20%;background:var(--blue)"></div></div><span class="stat-val">20%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:60%;background:var(--purple)"></div></div><span class="stat-val">60%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:30%;background:var(--pink)"></div></div><span class="stat-val">30%</span></div>
+        <span class="draw-tag draw-aggressive">aggressive draws</span>
+      </div>
+
+      <!-- maniac -->
+      <div class="profile-card">
+        <h4 style="color:var(--pink)">maniac</h4>
+        <div class="desc">Hyper-aggressive. Bets and raises at every opportunity.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:85%;background:var(--green)"></div></div><span class="stat-val">85%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:100%;background:var(--orange)"></div></div><span class="stat-val">1.00</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:30%;background:var(--blue)"></div></div><span class="stat-val">30%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:75%;background:var(--purple)"></div></div><span class="stat-val">75%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:45%;background:var(--pink)"></div></div><span class="stat-val">45%</span></div>
+        <span class="draw-tag draw-hyper">hyper draws</span>
+      </div>
+
+      <!-- short-stack -->
+      <div class="profile-card">
+        <h4 style="color:var(--cyan)">short-stack</h4>
+        <div class="desc">Simplified shove-or-fold at shallow stacks.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:55%;background:var(--green)"></div></div><span class="stat-val">55%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--orange)"></div></div><span class="stat-val">0.50</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:8%;background:var(--blue)"></div></div><span class="stat-val">8%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--purple)"></div></div><span class="stat-val">50%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:15%;background:var(--pink)"></div></div><span class="stat-val">15%</span></div>
+        <span class="draw-tag draw-aggressive">aggressive draws</span>
+      </div>
+
+      <!-- calling-station -->
+      <div class="profile-card">
+        <h4 style="color:var(--muted)">calling-station</h4>
+        <div class="desc">Calls everything. Rarely raises. Never bluffs.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:30%;background:var(--green)"></div></div><span class="stat-val">30%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:10%;background:var(--orange)"></div></div><span class="stat-val">0.10</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:40%;background:var(--blue)"></div></div><span class="stat-val">40%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:20%;background:var(--purple)"></div></div><span class="stat-val">20%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:5%;background:var(--pink)"></div></div><span class="stat-val">5%</span></div>
+        <span class="draw-tag draw-passive">passive draws</span>
+      </div>
+
+      <!-- loose-passive -->
+      <div class="profile-card">
+        <h4 style="color:var(--muted)">loose-passive</h4>
+        <div class="desc">Plays too many hands, checks and calls.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:30%;background:var(--green)"></div></div><span class="stat-val">30%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:10%;background:var(--orange)"></div></div><span class="stat-val">0.10</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:40%;background:var(--blue)"></div></div><span class="stat-val">40%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:20%;background:var(--purple)"></div></div><span class="stat-val">20%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:5%;background:var(--pink)"></div></div><span class="stat-val">5%</span></div>
+        <span class="draw-tag draw-passive">passive draws</span>
+      </div>
+
+      <!-- random -->
+      <div class="profile-card">
+        <h4 style="color:var(--text)">random</h4>
+        <div class="desc">Mostly random actions with lightweight weighting.</div>
+        <div class="stat-row"><span class="stat-label">C-bet</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--green)"></div></div><span class="stat-val">50%</span></div>
+        <div class="stat-row"><span class="stat-label">Bluff:Value</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--orange)"></div></div><span class="stat-val">0.50</span></div>
+        <div class="stat-row"><span class="stat-label">Float</span><div class="stat-bar"><div class="stat-fill" style="width:15%;background:var(--blue)"></div></div><span class="stat-val">15%</span></div>
+        <div class="stat-row"><span class="stat-label">Turn Barrel</span><div class="stat-bar"><div class="stat-fill" style="width:50%;background:var(--purple)"></div></div><span class="stat-val">50%</span></div>
+        <div class="stat-row"><span class="stat-label">River Bluff</span><div class="stat-bar"><div class="stat-fill" style="width:25%;background:var(--pink)"></div></div><span class="stat-val">25%</span></div>
+        <span class="draw-tag draw-standard">standard draws</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ OPPONENT MODEL ============ -->
+<section id="opponent-model">
+  <div class="container">
+    <h2>Opponent Model <span class="badge badge-type">type</span></h2>
+    <p>Real-time HUD-style stats on every player at your table. The biggest edge you can get.</p>
+
+    <div class="card">
+      <h3 style="margin-top:0">How it works</h3>
+      <p><code>context.villainProfiles</code> gives you a <code>Record&lt;string, VillainProfile&gt;</code> — stats on <strong>every player</strong> at the table, keyed by <code>playerId</code>.</p>
+      <p>Stats are aggregated across all hands played at this table (up to the <strong>last 50 hands</strong> loaded from disk). The more hands observed, the more reliable the reads.</p>
+      <p><code>context.villainProfile</code> is a convenience shortcut pointing to the <strong>primary opponent</strong> — the current aggressor, or the first active villain if no one has bet.</p>
+    </div>
+
+    <h3>VillainProfile Type</h3>
+    <div class="card">
+<pre><span class="kw">type</span> <span class="ty">VillainProfile</span> = {
+  <span class="cm">// Session-wide stats (across all hands)</span>
+  <span class="prop">vpip</span>: <span class="ty">number</span>              <span class="cm">// 0–1, voluntarily put money in pot</span>
+  <span class="prop">pfr</span>: <span class="ty">number</span>               <span class="cm">// 0–1, preflop raise frequency</span>
+  <span class="prop">af</span>: <span class="ty">number</span>                <span class="cm">// aggression factor (bets+raises / calls)</span>
+  <span class="prop">aggressionFreq</span>: <span class="ty">number</span>   <span class="cm">// 0–1</span>
+
+  <span class="cm">// Derived flags</span>
+  <span class="prop">isPassive</span>: <span class="ty">boolean</span>        <span class="cm">// af &lt; 1.0 or aggFreq &lt; 0.25</span>
+  <span class="prop">isAggressive</span>: <span class="ty">boolean</span>     <span class="cm">// af &gt; 2.0 or aggFreq &gt; 0.50</span>
+  <span class="prop">isLoose</span>: <span class="ty">boolean</span>          <span class="cm">// vpip &gt; 0.40</span>
+  <span class="prop">isTight</span>: <span class="ty">boolean</span>          <span class="cm">// vpip &lt; 0.22</span>
+
+  <span class="cm">// Current hand</span>
+  <span class="prop">calledBetCount</span>: <span class="ty">number</span>
+  <span class="prop">raisedCount</span>: <span class="ty">number</span>
+  <span class="prop">preflopAction</span>: <span class="str">"fold"</span> | <span class="str">"call"</span> | <span class="str">"raise"</span> | <span class="str">"unknown"</span>
+
+  <span class="cm">// Confidence</span>
+  <span class="prop">handsObserved</span>: <span class="ty">number</span>     <span class="cm">// completed hands with data</span>
+  <span class="prop">totalActions</span>: <span class="ty">number</span>
+}</pre>
+    </div>
+
+    <h3>Practical Example</h3>
+<pre><span class="cm">// Check if the UTG opener is a known nit before 3-betting light</span>
+<span class="kw">const</span> utg = context.<span class="prop">villainProfiles</span>[<span class="str">"utg-player-id"</span>]
+
+<span class="kw">if</span> (utg &amp;&amp; utg.<span class="prop">handsObserved</span> &gt;= <span class="num">10</span> &amp;&amp; utg.<span class="prop">isTight</span> &amp;&amp; utg.<span class="prop">pfr</span> &lt; <span class="num">0.15</span>) {
+  <span class="cm">// UTG nit opened — they have premiums, fold our marginal hand</span>
+  <span class="kw">return</span> { <span class="prop">action</span>: <span class="str">"fold"</span>, <span class="prop">reason</span>: <span class="str">"UTG nit opener"</span> }
+}
+
+<span class="cm">// Exploit a loose-passive player by value betting thinner</span>
+<span class="kw">const</span> villain = context.<span class="prop">villainProfile</span>
+<span class="kw">if</span> (villain &amp;&amp; villain.<span class="prop">isLoose</span> &amp;&amp; villain.<span class="prop">isPassive</span>) {
+  <span class="cm">// They call too much — bet for value with top pair</span>
+  <span class="kw">return</span> { <span class="prop">action</span>: <span class="str">"bet"</span>, <span class="prop">amount</span>: context.<span class="prop">potSize</span> * <span class="num">0.75</span>, <span class="prop">reason</span>: <span class="str">"value vs station"</span> }
+}</pre>
+
+    <div class="card" style="border-color:var(--orange)">
+      <p style="color:var(--orange);margin-bottom:4px"><strong>⚠ Confidence Note</strong></p>
+      <p>Derived flags (<code>isPassive</code>, <code>isAggressive</code>, <code>isLoose</code>, <code>isTight</code>) require <strong>5+ observed hands</strong> to activate. With fewer hands, all flags default to <code>false</code>. Always check <code>handsObserved</code> before making reads.</p>
+    </div>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ============ CONTAINER ============ -->
+<section id="container">
+  <div class="container">
+    <h2>📦 Container <span class="badge badge-class">global</span></h2>
+    <p>The <code>container</code> global gives your bot access to the full Luca dependency injection container. This is the escape hatch — it lets you call out to <strong>anything</strong> you can wire up: databases, HTTP APIs, LLMs, scripts, file systems, caches, or custom services you've registered. If you can write it in TypeScript and plug it into Luca, your bot can use it to make decisions within the action clock.</p>
+
+    <div class="card">
+      <h3>What you can do with it</h3>
+      <pre><code><span class="cm">// Call an external API for real-time odds</span>
+<span class="kw">const</span> client = container.<span class="fn">feature</span>(<span class="str">"httpClient"</span>)
+<span class="kw">const</span> odds = <span class="kw">await</span> client.<span class="fn">get</span>(<span class="str">"https://my-solver.api/equity"</span>, { hand, board })
+
+<span class="cm">// Query a database of solved preflop ranges</span>
+<span class="kw">const</span> db = container.<span class="fn">feature</span>(<span class="str">"diskCache"</span>)
+<span class="kw">const</span> gtoRange = <span class="kw">await</span> db.<span class="fn">get</span>(<span class="str">`ranges:${position}:${raiseCount}`</span>)
+
+<span class="cm">// Ask an LLM to reason about a tricky spot</span>
+<span class="kw">const</span> convo = <span class="kw">await</span> container.<span class="fn">conversation</span>({ model: <span class="str">"gpt-4.1-mini"</span> })
+<span class="kw">const</span> advice = <span class="kw">await</span> convo.<span class="fn">ask</span>(<span class="str">`Should I call ${toCall} into ${potSize} with ${hand}?`</span>)
+
+<span class="cm">// Read from the file system</span>
+<span class="kw">const</span> fs = container.<span class="fn">feature</span>(<span class="str">"fs"</span>)
+<span class="kw">const</span> notes = <span class="kw">await</span> fs.<span class="fn">readFile</span>(<span class="str">"strategy-notes.md"</span>)
+
+<span class="cm">// Access project paths, state, utilities</span>
+container.paths     <span class="cm">// project directory structure</span>
+container.state     <span class="cm">// persistent state store</span>
+container.utils     <span class="cm">// helper utilities</span></code></pre>
+      <p style="margin-top:12px">The only constraint is the <strong>action clock</strong> — your bot has a limited window to respond. Anything that returns in time is fair game.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="container">
+    Pokurr Strategy API — <code>pokurr new-agent my-bot</code> to get started
+  </div>
+</footer>
+
+</body>
+</html>

@@ -2,6 +2,8 @@ import { Range, normalizeCombo, stringToCard } from "@pokurr/core"
 
 import type { GameEngine } from "./game-engine"
 import type { PokerAction, PokerPosition, Strategy } from "./strategy"
+import { buildVillainProfile, narrowVillainRange } from "../lib/opponent-model"
+import type { VillainProfile } from "../lib/opponent-model"
 
 export type ActorDecision = {
   action: PokerAction
@@ -154,14 +156,81 @@ export class Actor {
     }
 
     if (!decision) {
+      // Get current street actions
+      const currentStreet = this.game.game.stage === "waiting" || this.game.game.stage === "complete" || this.game.game.stage === "showdown"
+        ? "preflop"
+        : this.game.game.stage
+      const streetActions = this.game.game.actionHistory.filter(a => a.street === currentStreet)
+
+      // Count raises on this street
+      const raiseActions = streetActions.filter(a =>
+        a.action === "raise" || (a.action === "all-in" && a.amount && a.amount > (this.game.game.currentBet || 0))
+      )
+      const raiseCount = raiseActions.length
+
+      // Who was the last aggressor?
+      const lastRaise = raiseActions.length > 0 ? raiseActions[raiseActions.length - 1] : null
+      const aggressor = lastRaise?.playerId || null
+      const isAggressor = aggressor === this.playerId
+
+      // SPR
+      const spr = this.game.game.pot > 0 ? this.chips / this.game.game.pot : 999
+
+      // Street index
+      const streetIndex = ({ preflop: 0, flop: 1, turn: 2, river: 3 } as Record<string, number>)[currentStreet] ?? 0
+
+      // Street history for context
+      const streetHistory = streetActions.map(a => ({
+        playerId: a.playerId,
+        action: a.action,
+        ...(a.amount !== undefined ? { amount: a.amount } : {}),
+      }))
+
+      // Opponent modeling: build profiles for every player at the table (not just current hand)
+      const allOpponents = this.game.game.players.filter(p => p.id !== this.playerId)
+      const activeOpponents = allOpponents.filter(p => p.inHand && !p.folded)
+      const villainProfiles: Record<string, VillainProfile> = {}
+      let villainProfile: VillainProfile | null = null
+      let computedVillainRange = options.villainRange
+
+      // Fetch recent hand history for cross-hand opponent modeling
+      let historicalHands: Array<{ players: Array<{ id: string }>; actions: Array<{ playerId: string; action: string; amount?: number; street: string }> }> = []
+      try {
+        const recent = await this.game.recentHands(50)
+        historicalHands = recent
+      } catch {
+        // disk cache may not be available in all contexts
+      }
+
+      // Build a profile for every opponent at the table — not just those in the current hand.
+      // This gives you reads on players who folded this hand but you'll face in future hands.
+      for (const opponent of allOpponents) {
+        villainProfiles[opponent.id] = buildVillainProfile(this.game.game.actionHistory, opponent.id, historicalHands)
+      }
+
+      // Pick a primary villain: the aggressor if active, otherwise first active opponent
+      if (activeOpponents.length > 0) {
+        const primaryId = (aggressor && villainProfiles[aggressor] && activeOpponents.some(p => p.id === aggressor))
+          ? aggressor
+          : activeOpponents[0].id
+        villainProfile = villainProfiles[primaryId] || null
+
+        if (!computedVillainRange && villainProfile) {
+          const villainPosition = seatPosition(this.game, primaryId)
+          computedVillainRange = narrowVillainRange(villainProfile, villainPosition, currentStreet, raiseCount)
+        }
+      }
+
       const result = await this.strategy.decide(
         options.profileName,
         {
           heroCards: this.holding.length === 2 ? this.holding : ["Ah", "As"],
           ...(options.villainCards ? { villainCards: options.villainCards } : {}),
-          ...(options.villainRange ? { villainRange: options.villainRange } : {}),
+          ...(computedVillainRange ? { villainRange: computedVillainRange } : {}),
+          villainProfiles,
+          villainProfile,
           board: this.game.game.board,
-          street: this.game.game.stage === "waiting" || this.game.game.stage === "complete" ? "preflop" : this.game.game.stage,
+          street: currentStreet as "preflop" | "flop" | "turn" | "river",
           position: this.position,
           inPosition: options.inPosition ?? ["BTN", "CO"].includes(this.position),
           checkedTo: this.toGo <= 0,
@@ -171,8 +240,14 @@ export class Actor {
           playersInHand: this.playersLeftInHand,
           playersLeftToAct: this.game.game.players.filter((player) => player.inHand && !player.folded && !player.allIn).length,
           facingBet: this.toGo > 0,
-          facingRaise: this.toGo > 0,
-          facingThreeBet: false,
+          facingRaise: raiseCount >= 1 && this.toGo > 0,
+          facingThreeBet: raiseCount >= 2 && this.toGo > 0,
+          raiseCount,
+          streetHistory,
+          aggressor,
+          isAggressor,
+          spr,
+          streetIndex,
         },
       )
 

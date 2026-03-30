@@ -39,6 +39,13 @@ type ActionPreset = {
   amount: number
 }
 
+type FeedEntry = {
+  text: string
+  color?: string
+  bold?: boolean
+  dim?: boolean
+}
+
 type PlayState = {
   tableId: string
   heroName: string
@@ -60,23 +67,36 @@ type PlayState = {
   pendingAction: boolean
   selectedPreset: number
   status: string
-  feed: string[]
+  feed: FeedEntry[]
   heroWins: number
   villainWins: number
   handsCompleted: number
   lastPot: number
+  dealerIsHero: boolean
+  betInputMode: boolean
+  customBetInput: string
+  lastLoggedStage: string
 }
 
-function appendFeed(state: PlayState, line: string) {
-  state.feed.unshift(line)
-  if (state.feed.length > 24) state.feed.length = 24
+function appendFeed(state: PlayState, entry: FeedEntry) {
+  state.feed.unshift(entry)
+  if (state.feed.length > 40) state.feed.length = 40
+}
+
+function suitColor(suit: string): string {
+  if (suit === "h" || suit === "d") return "red"
+  if (suit === "s") return "white"
+  return "green"
+}
+
+function suitSymbol(suit: string): string {
+  return suit === "h" ? "♥" : suit === "d" ? "♦" : suit === "c" ? "♣" : suit === "s" ? "♠" : suit
 }
 
 function prettyCard(card: string): string {
   const suit = card.slice(-1)
   const rank = card.slice(0, -1)
-  const symbol = suit === "h" ? "♥" : suit === "d" ? "♦" : suit === "c" ? "♣" : suit === "s" ? "♠" : suit
-  return `${rank}${symbol}`
+  return `${rank}${suitSymbol(suit)}`
 }
 
 function prettyCards(cards: string[]): string {
@@ -100,12 +120,6 @@ function buildPresets(state: PlayState): ActionPreset[] {
     { label: "raise", amount: Math.min(stack, minRaise) },
     { label: "jam", amount: stack },
   ]
-}
-
-function actionHint(state: PlayState): string {
-  if (!state.pendingAction) return "Waiting for next decision..."
-  const primary = state.toCall > 0 ? "x/c/enter=call" : "x/c/enter=check"
-  return `${primary}  f=fold  b=bet  r=raise  a=all-in  [ ]=size  q=quit`
 }
 
 async function sendAction(client: PokerClient, state: PlayState, action: string, amount?: number) {
@@ -151,105 +165,6 @@ function playerLabel(playerId: string, heroBotId: string, state: PlayState): str
   return playerId ? `Player ${playerId.slice(0, 6)}` : "Unknown"
 }
 
-function normalizeDecision(available: string[], toCall: number, pot: number, candidate: { action?: string; amount?: number }) {
-  let action = String(candidate.action || "").trim().toLowerCase()
-  let amount = Number(candidate.amount)
-  const can = (name: string) => available.includes(name)
-
-  if (!can(action)) {
-    action = toCall > 0 ? (can("call") ? "call" : "fold") : (can("check") ? "check" : "bet")
-  }
-
-  if ((action === "bet" || action === "raise") && !Number.isFinite(amount)) {
-    amount = action === "raise"
-      ? Math.max(toCall * 2, Math.round(Math.max(2, pot * 0.75)))
-      : Math.max(1, Math.round(Math.max(1, pot * 0.5)))
-  }
-
-  return Number.isFinite(amount) ? { action, amount } : { action }
-}
-
-function createBotAutoplayer(
-  container: AGIContainer & any,
-  client: PokerClient,
-  profileName: string,
-  heroCardsFallback: [string, string] = ["Ah", "As"],
-) {
-  const strategyFeature = container.feature("strategy", { enable: true }) as any
-  const live = {
-    heroCards: heroCardsFallback,
-    board: [] as string[],
-    stage: "preflop",
-    position: "BTN" as PokerPosition,
-    stack: 0,
-    pot: 0,
-    toCall: 0,
-    playersInHand: 2,
-  }
-
-  return client.onMessage((message) => {
-    if (message.type === "deal") {
-      const cards = Array.isArray(message.payload?.holeCards) && message.payload!.holeCards.length === 2
-        ? [String(message.payload!.holeCards[0]), String(message.payload!.holeCards[1])] as [string, string]
-        : heroCardsFallback
-      live.heroCards = cards
-      live.board = []
-      live.stage = "preflop"
-      live.position = parsePosition(String(message.payload?.position || live.position))
-      return
-    }
-
-    if (message.type === "state") {
-      live.board = Array.isArray(message.payload?.board) ? message.payload!.board.map(String) : live.board
-      live.stage = String(message.payload?.stage || live.stage)
-      live.position = parsePosition(String(message.payload?.position || live.position))
-      live.stack = Number(message.payload?.stack || live.stack || 0)
-      live.pot = Number(message.payload?.pot || live.pot || 0)
-      live.toCall = Number(message.payload?.toCall || 0)
-      live.playersInHand = Number(message.payload?.playersInHand || live.playersInHand || 2)
-      return
-    }
-
-    if (message.type !== "action_on_you") return
-
-    const available = Array.isArray(message.payload?.availableActions) ? message.payload!.availableActions.map(String) : []
-    const toCall = Number(message.payload?.toCall ?? live.toCall ?? 0)
-    const pot = Number(message.payload?.pot ?? live.pot ?? 0)
-    const stack = Number(message.payload?.stack ?? live.stack ?? 0)
-    const street = ["flop", "turn", "river"].includes(String(message.payload?.stage || live.stage))
-      ? String(message.payload?.stage || live.stage)
-      : "preflop"
-    const position = parsePosition(String(message.payload?.position || live.position))
-    const inPosition = ["BTN", "CO"].includes(position)
-
-    void (async () => {
-      try {
-        const decision = await strategyFeature.decide(profileName, {
-          heroCards: live.heroCards,
-          board: live.board,
-          street,
-          position,
-          inPosition,
-          checkedTo: toCall <= 0,
-          potSize: pot,
-          toCall,
-          effectiveStack: stack,
-          playersInHand: Number(message.payload?.playersInHand || live.playersInHand || 2),
-          playersLeftToAct: Math.max(0, Number(message.payload?.playersInHand || live.playersInHand || 2) - 1),
-          facingBet: toCall > 0,
-          facingRaise: toCall > 0,
-          facingThreeBet: false,
-        })
-        const selected = normalizeDecision(available, toCall, pot, decision || {})
-        await client.send("action", selected)
-      } catch {
-        const fallback = toCall > 0 ? (available.includes("call") ? { action: "call" } : { action: "fold" }) : { action: "check" }
-        await client.send("action", fallback)
-      }
-    })()
-  })
-}
-
 export async function runPlayMode(
   container: AGIContainer & any,
   options: { serverBaseUrl: string; opponent: string; name?: string; actionTimeout?: number; viewOpponentHolecards?: boolean },
@@ -266,20 +181,10 @@ export async function runPlayMode(
     throw new Error("Hero registration did not return wsUrl/token/botId")
   }
 
-  const villainRegistration = await registerParticipant(container, serverBaseUrl, `Bot ${opponent}`)
-  const villainWsUrl = String(villainRegistration.wsUrl || "").trim()
-  const villainToken = String(villainRegistration.token || "").trim()
-  if (!villainWsUrl || !villainToken) {
-    throw new Error("Villain registration did not return wsUrl/token")
-  }
-
   const heroClient = new PokerClient(container, { wsUrl: heroWsUrl, reconnect: true })
-  const villainClient = new PokerClient(container, { wsUrl: villainWsUrl, reconnect: true })
 
   await heroClient.connect()
   await heroClient.authenticate(heroToken)
-  await villainClient.connect()
-  await villainClient.authenticate(villainToken)
 
   await heroClient.send("create_table", {
     name: `Play vs ${opponent}`,
@@ -287,22 +192,11 @@ export async function runPlayMode(
     startingStack: 120,
     maxPlayers: 2,
     actionTimeout: Math.max(8, Number(options.actionTimeout || 20)),
+    preferredHouseActor: opponent,
   })
   const created = await heroClient.waitFor("table_created", 10_000)
   const tableId = String(created.payload?.id || "")
   if (!tableId) throw new Error("Failed to create play table")
-
-  await heroClient.joinTable(tableId)
-  await villainClient.joinTable(tableId)
-  const stopVillainAutoplay = createBotAutoplayer(container, villainClient, opponent)
-
-  const ink = container.feature("ink", { enable: true, patchConsole: true })
-  await ink.loadModules()
-  const React = ink.React
-  const h = React.createElement
-  const { useEffect, useState } = React
-  const { Box, Text } = ink.components
-  const { useApp, useInput, useStdout } = ink.hooks
 
   const state: PlayState = {
     tableId,
@@ -335,116 +229,150 @@ export async function runPlayMode(
     villainWins: 0,
     handsCompleted: 0,
     lastPot: 0,
+    dealerIsHero: true,
+    betInputMode: false,
+    customBetInput: "",
+    lastLoggedStage: "",
   }
 
+  // Rerender function — gets wired once Ink instance is created
+  let rerender: (() => void) | null = null
+  let renderTick = 0
+
+  function handleMessage(message: { type: string; payload?: Record<string, unknown> }) {
+    renderTick += 1
+
+    if (message.type === "deal") {
+      const cards = Array.isArray(message.payload?.holeCards) ? message.payload!.holeCards.map(String) : []
+      state.heroCards = cards
+      state.board = []
+      state.stage = "preflop"
+      state.lastLoggedStage = "preflop"
+      state.toCall = 0
+      state.timeRemaining = 0
+      state.villainCards = []
+      state.pendingAction = false
+      state.availableActions = []
+      state.position = parsePosition(String(message.payload?.position || state.position))
+      state.dealerIsHero = state.position === "BTN" || state.position === "SB"
+      state.handNumber += 1
+      state.status = `Hand #${state.handNumber}`
+      appendFeed(state, { text: `── Hand #${state.handNumber} ─────────────────`, color: "gray", dim: true })
+      appendFeed(state, { text: `PREFLOP  You: ${prettyCards(cards)}`, color: "white", bold: true })
+    }
+
+    if (message.type === "table_joined") {
+      syncTablePlayers(state, message.payload, heroBotId)
+    }
+
+    if (message.type === "state") {
+      const newStage = String(message.payload?.stage || state.stage)
+      state.board = Array.isArray(message.payload?.board) ? message.payload!.board.map(String) : state.board
+      state.pot = Number(message.payload?.pot || state.pot || 0)
+      state.toCall = Number(message.payload?.toCall || 0)
+      state.stack = Number(message.payload?.stack || state.stack || 0)
+      state.playersInHand = Number(message.payload?.playersInHand || state.playersInHand || 2)
+      state.availableActions = Array.isArray(message.payload?.availableActions) ? message.payload!.availableActions.map(String) : state.availableActions
+      state.position = parsePosition(String(message.payload?.position || state.position))
+      state.dealerIsHero = state.position === "BTN" || state.position === "SB"
+      syncTablePlayers(state, message.payload, heroBotId)
+
+      // Log street transitions
+      if (newStage !== state.lastLoggedStage && ["flop", "turn", "river"].includes(newStage)) {
+        state.lastLoggedStage = newStage
+        const boardStr = state.board.length > 0 ? `  ${prettyCards(state.board)}` : ""
+        appendFeed(state, { text: `${newStage.toUpperCase()}${boardStr}`, color: "green", bold: true })
+      }
+      state.stage = newStage
+    }
+
+    if (message.type === "action_taken") {
+      const playerName = String(message.payload?.playerName || message.payload?.playerId || "")
+      const action = String(message.payload?.action || "")
+      const rawAmount = message.payload?.amount
+      const amountStr = rawAmount !== undefined && Number(rawAmount) > 0 ? ` $${rawAmount}` : ""
+      const isHero = playerName === state.heroName || String(message.payload?.playerId || "") === heroBotId
+      const label = isHero ? "You" : (playerName || state.villain.name)
+      appendFeed(state, {
+        text: `${label}: ${action}${amountStr}`,
+        color: isHero ? "cyan" : "white",
+      })
+    }
+
+    if (message.type === "timebank_state") {
+      state.timeBankRemaining = Number(message.payload?.timeBankRemaining || state.timeBankRemaining || 0)
+    }
+
+    if (message.type === "action_on_you") {
+      state.pendingAction = true
+      state.availableActions = Array.isArray(message.payload?.availableActions) ? message.payload!.availableActions.map(String) : state.availableActions
+      state.toCall = Number(message.payload?.toCall ?? state.toCall ?? 0)
+      state.pot = Number(message.payload?.pot ?? state.pot ?? 0)
+      state.stack = Number(message.payload?.stack ?? state.stack ?? 0)
+      state.timeRemaining = Number(message.payload?.timeRemaining ?? state.timeRemaining ?? 0)
+      state.timeBankRemaining = Number(message.payload?.timeBankRemaining ?? state.timeBankRemaining ?? 0)
+      state.status = "Your action"
+      // Not logged to feed — already shown in status bar
+    }
+
+    if (message.type === "hand_result") {
+      state.pendingAction = false
+      state.availableActions = []
+      state.handsCompleted += 1
+      state.lastPot = Number(message.payload?.pot || 0)
+      state.board = Array.isArray(message.payload?.board) ? message.payload!.board.map(String) : state.board
+      const stacks = Array.isArray(message.payload?.stacks) ? message.payload!.stacks as Array<any> : []
+      const heroStack = stacks.find((entry) => String(entry?.playerId || "") === heroBotId)
+      const villainStack = stacks.find((entry) => String(entry?.playerId || "") !== heroBotId)
+      if (heroStack) state.stack = Number(heroStack.stack || state.stack || 0)
+      if (villainStack) state.villain.stack = Number(villainStack.stack || state.villain.stack || 0)
+      const revealedVillainCards = extractVillainCards(message.payload, heroBotId, state.villain.botId)
+      if (revealedVillainCards.length > 0) {
+        state.villainCards = revealedVillainCards
+      }
+      const winners = Array.isArray(message.payload?.winners) ? message.payload!.winners as Array<any> : []
+      const heroWon = winners.some((entry) => String(entry?.playerId || "") === heroBotId)
+      if (heroWon) state.heroWins += 1
+      else state.villainWins += 1
+      state.status = heroWon ? "You won the hand" : "Opponent won the hand"
+      if (state.villainCards.length > 0) {
+        appendFeed(state, { text: `${state.villain.name} showed ${prettyCards(state.villainCards)}`, color: "gray" })
+      }
+      appendFeed(state, {
+        text: heroWon ? `WIN  +$${state.lastPot}` : `LOSE  $${state.lastPot} to ${state.villain.name}`,
+        color: heroWon ? "green" : "red",
+        bold: true,
+      })
+    }
+
+    if (message.type === "error") {
+      state.status = String(message.payload?.message || "error")
+      appendFeed(state, { text: `! ${state.status}`, color: "red" })
+    }
+
+    if (rerender) rerender()
+  }
+
+  // Register listener BEFORE joining so we catch the deal event
+  const stopListening = heroClient.onMessage(handleMessage)
+  await heroClient.joinTable(tableId)
+
+  const ink = container.feature("ink", { enable: true, patchConsole: true })
+  await ink.loadModules()
+  const React = ink.React
+  const h = React.createElement
+  const { Box, Text } = ink.components
+  const { useApp, useInput, useStdout } = ink.hooks
+
   function cleanup() {
-    stopVillainAutoplay()
-    return Promise.allSettled([
-      heroClient.disconnect(),
-      villainClient.disconnect(),
-    ])
+    stopListening()
+    return heroClient.disconnect()
   }
 
   function App() {
     const { exit } = useApp()
     const { stdout } = useStdout()
-    const [tick, setTick] = useState(0)
-
-    useEffect(() => {
-      const unsubscribe = heroClient.onMessage((message) => {
-        if (message.type === "deal") {
-          const cards = Array.isArray(message.payload?.holeCards) ? message.payload!.holeCards.map(String) : []
-          state.heroCards = cards
-          state.board = []
-          state.stage = "preflop"
-          state.toCall = 0
-          state.timeRemaining = 0
-          state.villainCards = []
-          state.pendingAction = false
-          state.availableActions = []
-          state.position = parsePosition(String(message.payload?.position || state.position))
-          state.handNumber += 1
-          state.status = `Hand #${state.handNumber}`
-          appendFeed(state, `♠ Hand ${state.handNumber} dealt: ${prettyCards(cards)}`)
-        }
-
-        if (message.type === "table_joined") {
-          syncTablePlayers(state, message.payload, heroBotId)
-          appendFeed(state, `Joined table ${String(message.payload?.tableId || state.tableId)}`)
-        }
-
-        if (message.type === "state") {
-          state.stage = String(message.payload?.stage || state.stage)
-          state.board = Array.isArray(message.payload?.board) ? message.payload!.board.map(String) : state.board
-          state.pot = Number(message.payload?.pot || state.pot || 0)
-          state.toCall = Number(message.payload?.toCall || 0)
-          state.stack = Number(message.payload?.stack || state.stack || 0)
-          state.playersInHand = Number(message.payload?.playersInHand || state.playersInHand || 2)
-          state.availableActions = Array.isArray(message.payload?.availableActions) ? message.payload!.availableActions.map(String) : state.availableActions
-          state.position = parsePosition(String(message.payload?.position || state.position))
-          syncTablePlayers(state, message.payload, heroBotId)
-        }
-
-        if (message.type === "action_taken") {
-          const actor = String(message.payload?.playerName || "player")
-          const action = String(message.payload?.action || "")
-          const amount = message.payload?.amount !== undefined ? ` ${String(message.payload.amount)}` : ""
-          appendFeed(state, `♦ ${actor}: ${action}${amount}`)
-        }
-
-        if (message.type === "timebank_state") {
-          state.timeBankRemaining = Number(message.payload?.timeBankRemaining || state.timeBankRemaining || 0)
-        }
-
-        if (message.type === "action_on_you") {
-          state.pendingAction = true
-          state.availableActions = Array.isArray(message.payload?.availableActions) ? message.payload!.availableActions.map(String) : state.availableActions
-          state.toCall = Number(message.payload?.toCall ?? state.toCall ?? 0)
-          state.pot = Number(message.payload?.pot ?? state.pot ?? 0)
-          state.stack = Number(message.payload?.stack ?? state.stack ?? 0)
-          state.timeRemaining = Number(message.payload?.timeRemaining ?? state.timeRemaining ?? 0)
-          state.timeBankRemaining = Number(message.payload?.timeBankRemaining ?? state.timeBankRemaining ?? 0)
-          state.status = "Your action"
-          appendFeed(state, `♥ Decision on you: ${state.availableActions.join(", ")}`)
-        }
-
-        if (message.type === "hand_result") {
-          state.pendingAction = false
-          state.availableActions = []
-          state.handsCompleted += 1
-          state.lastPot = Number(message.payload?.pot || 0)
-          state.board = Array.isArray(message.payload?.board) ? message.payload!.board.map(String) : state.board
-          const stacks = Array.isArray(message.payload?.stacks) ? message.payload!.stacks as Array<any> : []
-          const heroStack = stacks.find((entry) => String(entry?.playerId || "") === heroBotId)
-          const villainStack = stacks.find((entry) => String(entry?.playerId || "") !== heroBotId)
-          if (heroStack) state.stack = Number(heroStack.stack || state.stack || 0)
-          if (villainStack) state.villain.stack = Number(villainStack.stack || state.villain.stack || 0)
-          const revealedVillainCards = extractVillainCards(message.payload, heroBotId, state.villain.botId)
-          if (revealedVillainCards.length > 0) {
-            state.villainCards = revealedVillainCards
-          }
-          const winners = Array.isArray(message.payload?.winners) ? message.payload!.winners as Array<any> : []
-          const heroWon = winners.some((entry) => String(entry?.playerId || "") === heroBotId)
-          if (heroWon) state.heroWins += 1
-          else state.villainWins += 1
-          const winnerNames = winners
-            .map((entry) => playerLabel(String(entry?.playerId || ""), heroBotId, state))
-            .filter(Boolean)
-          const showdownNote = state.villainCards.length > 0 ? ` | ${state.villain.name} showed ${prettyCards(state.villainCards)}` : ""
-          state.status = heroWon ? "You won the hand" : "Opponent won the hand"
-          appendFeed(state, `${heroWon ? "🏆" : "☠"} Pot ${state.lastPot}${winnerNames.length ? ` | Winner ${winnerNames.join(", ")}` : ""}${showdownNote}`)
-        }
-
-        if (message.type === "error") {
-          state.status = String(message.payload?.message || "error")
-          appendFeed(state, `✗ ${state.status}`)
-        }
-
-        setTick((value) => value + 1)
-      })
-
-      return () => unsubscribe()
-    }, [])
+    const tick = renderTick
 
     useInput((input: string, key: any) => {
       const presets = buildPresets(state)
@@ -456,14 +384,59 @@ export async function runPlayMode(
         return
       }
 
+      // Custom bet input mode: digits build amount, backspace removes, enter submits, escape cancels
+      if (state.betInputMode) {
+        if (key.escape) {
+          state.betInputMode = false
+          state.customBetInput = ""
+          if (rerender) rerender()
+          return
+        }
+        if (key.backspace || key.delete) {
+          state.customBetInput = state.customBetInput.slice(0, -1)
+          if (state.customBetInput === "") state.betInputMode = false
+          if (rerender) rerender()
+          return
+        }
+        if (/^\d$/.test(input)) {
+          state.customBetInput += input
+          if (rerender) rerender()
+          return
+        }
+        if (key.return && state.pendingAction) {
+          const amount = parseInt(state.customBetInput, 10)
+          if (!isNaN(amount) && amount > 0) {
+            if (can("bet")) void sendAction(heroClient, state, "bet", amount)
+            else if (can("raise")) void sendAction(heroClient, state, "raise", amount)
+          }
+          state.betInputMode = false
+          state.customBetInput = ""
+          if (rerender) rerender()
+          return
+        }
+        return
+      }
+
+      // Digit key starts custom bet input mode (when action is pending)
+      if (state.pendingAction && /^\d$/.test(input) && (can("bet") || can("raise"))) {
+        state.betInputMode = true
+        state.customBetInput = input
+        if (rerender) rerender()
+        return
+      }
+
       if (key.leftArrow || input === "[") {
         state.selectedPreset = Math.max(0, state.selectedPreset - 1)
-        setTick((value) => value + 1)
+        state.betInputMode = false
+        state.customBetInput = ""
+        if (rerender) rerender()
         return
       }
       if (key.rightArrow || input === "]") {
         state.selectedPreset = Math.min(presets.length - 1, state.selectedPreset + 1)
-        setTick((value) => value + 1)
+        state.betInputMode = false
+        state.customBetInput = ""
+        if (rerender) rerender()
         return
       }
 
@@ -471,87 +444,245 @@ export async function runPlayMode(
 
       if ((input === "x" || input === "c" || key.return) && can(state.toCall > 0 ? "call" : "check")) {
         void sendAction(heroClient, state, state.toCall > 0 ? "call" : "check")
-        setTick((value) => value + 1)
+        if (rerender) rerender()
         return
       }
       if (input === "f" && can("fold")) {
         void sendAction(heroClient, state, "fold")
-        setTick((value) => value + 1)
+        if (rerender) rerender()
         return
       }
       if (input === "b" && can("bet")) {
-        void sendAction(heroClient, state, "bet", currentPreset.amount)
-        setTick((value) => value + 1)
+        const amount = state.customBetInput ? parseInt(state.customBetInput, 10) : currentPreset.amount
+        void sendAction(heroClient, state, "bet", amount)
+        state.betInputMode = false
+        state.customBetInput = ""
+        if (rerender) rerender()
         return
       }
       if (input === "r" && can("raise")) {
-        void sendAction(heroClient, state, "raise", currentPreset.amount)
-        setTick((value) => value + 1)
+        const amount = state.customBetInput ? parseInt(state.customBetInput, 10) : currentPreset.amount
+        void sendAction(heroClient, state, "raise", amount)
+        state.betInputMode = false
+        state.customBetInput = ""
+        if (rerender) rerender()
         return
       }
       if (input === "a" && can("all-in")) {
         void sendAction(heroClient, state, "all-in")
-        setTick((value) => value + 1)
+        if (rerender) rerender()
       }
     })
 
-    const cols = stdout.columns || 110
-    const leftWidth = Math.max(42, Math.floor(cols * 0.46))
-    const rightWidth = Math.max(46, cols - leftWidth - 3)
-    const presets = buildPresets(state)
-    const preset = presets[state.selectedPreset] || presets[1] || presets[0]
-    const actionBar = presets.map((entry, index) => index === state.selectedPreset ? `[${entry.label}:${entry.amount}]` : `${entry.label}:${entry.amount}`).join("  ")
-    const opponentCardsText = state.villainCards.length > 0 ? prettyCards(state.villainCards) : "hidden"
-    const feedLines = state.feed.length ? state.feed : ["Waiting for game events..."]
+    const cols = stdout.columns || 120
+    const rows = stdout.rows || 40
+    const LOG_WIDTH = 34
+    const mainWidth = cols - LOG_WIDTH - 1
 
-    return h(
-      Box,
-      { flexDirection: "column", width: cols, paddingX: 1 },
-      h(
-        Box,
-        { justifyContent: "space-between", marginBottom: 1 },
-        h(Text, { bold: true, color: "cyan" }, `POKURR PLAY  ${state.heroName} vs ${state.villain.name}`),
-        h(Text, { color: state.pendingAction ? "magenta" : "green" }, state.status),
+    const presets = buildPresets(state)
+    const can = (a: string) => state.availableActions.includes(a)
+
+    // -- Dealer button chip --
+    function DealerBtn() {
+      return h(Box, { borderStyle: "round", borderColor: "white", paddingX: 1, marginLeft: 1 },
+        h(Text, { color: "white", bold: true }, "D"))
+    }
+
+    // -- helper: render a single card as a mini box --
+    function Card(props: { card: string; faceDown?: boolean }) {
+      if (props.faceDown) {
+        return h(Box, { borderStyle: "round", borderColor: "gray", paddingX: 1 },
+          h(Text, { color: "gray" }, "??"))
+      }
+      const suit = props.card.slice(-1)
+      const rank = props.card.slice(0, -1)
+      const color = suitColor(suit)
+      return h(Box, { borderStyle: "round", borderColor: color, paddingX: 1 },
+        h(Text, { color, bold: true }, `${rank}${suitSymbol(suit)}`))
+    }
+
+    // -- helper: action button --
+    function Btn(props: { label: string; hotkey: string; active: boolean; selected?: boolean; color?: string }) {
+      const borderColor = props.selected ? "yellow" : props.active ? (props.color || "green") : "gray"
+      const textColor = props.selected ? "yellow" : props.active ? "white" : "gray"
+      return h(Box, { borderStyle: "round", borderColor, paddingX: 1, marginRight: 1 },
+        h(Text, { color: textColor, bold: props.active }, `${props.hotkey.toUpperCase()}) ${props.label}`))
+    }
+
+    // -- helper: sizing chip --
+    function Chip(props: { label: string; amount: number; selected: boolean }) {
+      return h(Box, {
+        borderStyle: props.selected ? "bold" : "round",
+        borderColor: props.selected ? "yellow" : "gray",
+        paddingX: 1,
+        marginRight: 1,
+      },
+        h(Text, { color: props.selected ? "yellow" : "gray", bold: props.selected }, `${props.label} ${props.amount}`))
+    }
+
+    // -- opponent cards --
+    const villainCardEls = state.villainCards.length > 0
+      ? state.villainCards.map((c, i) => h(Card, { key: `vc${i}`, card: c }))
+      : [h(Card, { key: "vc0", faceDown: true }), h(Card, { key: "vc1", faceDown: true })]
+
+    // -- hero cards --
+    const heroCardEls = state.heroCards.length > 0
+      ? state.heroCards.map((c, i) => h(Card, { key: `hc${i}`, card: c }))
+      : [h(Card, { key: "hc0", faceDown: true }), h(Card, { key: "hc1", faceDown: true })]
+
+    // -- board cards --
+    const boardCardEls = state.board.length > 0
+      ? state.board.map((c, i) => h(Card, { key: `bc${i}`, card: c }))
+      : []
+
+    // -- derive bet amount label --
+    const betAmountLabel = state.betInputMode
+      ? `$${state.customBetInput}_`
+      : `$${presets[state.selectedPreset]?.amount || 0}`
+
+    return h(Box, { flexDirection: "row", width: cols },
+
+      // ── LEFT: main play area ──
+      h(Box, { flexDirection: "column", width: mainWidth, paddingX: 1 },
+
+        // title bar
+        h(Box, { justifyContent: "space-between", marginBottom: 0 },
+          h(Text, { bold: true, color: "green" }, `POKURR`),
+          h(Text, { dimColor: true }, `Hand #${state.handNumber}  ${streetLabel(state.stage)}`),
+          h(Text, { color: state.pendingAction ? "yellow" : "green", bold: true }, state.status),
+        ),
+
+        // ── villain seat (OUTSIDE the felt) ──
+        h(Box, { flexDirection: "row", justifyContent: "center", alignItems: "center", marginY: 1 },
+          h(Box, { flexDirection: "row", alignItems: "center" },
+            h(Box, { flexDirection: "column", alignItems: "center" },
+              h(Box, { flexDirection: "row", gap: 1, alignItems: "center" },
+                h(Text, { color: "red", bold: true }, state.villain.name),
+                h(Text, { dimColor: true }, state.villain.profile ? `(${state.villain.profile})` : ""),
+                h(Text, { color: "white" }, `$${state.villain.stack}`),
+                !state.dealerIsHero ? h(DealerBtn, {}) : null,
+              ),
+              h(Box, { flexDirection: "row", marginTop: 0 }, ...villainCardEls),
+            ),
+          ),
+        ),
+
+        // ── green table felt (board + pot only) ──
+        h(Box, {
+          flexDirection: "column",
+          borderStyle: "round",
+          borderColor: "green",
+          paddingX: 4,
+          paddingY: 1,
+          alignItems: "center",
+          marginX: 4,
+        },
+          h(Box, { flexDirection: "row", gap: 1 }, ...boardCardEls),
+          boardCardEls.length === 0
+            ? h(Text, { dimColor: true }, "— waiting for cards —")
+            : null,
+          h(Box, { marginTop: 1, flexDirection: "row", gap: 2 },
+            h(Text, { color: "yellow", bold: true }, `POT $${state.pot}`),
+            state.toCall > 0
+              ? h(Text, { color: "red" }, `to call: $${state.toCall}`)
+              : null,
+          ),
+        ),
+
+        // ── hero seat (OUTSIDE the felt) ──
+        h(Box, { flexDirection: "row", justifyContent: "center", alignItems: "center", marginY: 1 },
+          h(Box, { flexDirection: "column", alignItems: "center" },
+            h(Box, { flexDirection: "row", marginBottom: 0 }, ...heroCardEls),
+            h(Box, { flexDirection: "row", gap: 1, marginTop: 0, alignItems: "center" },
+              h(Text, { color: "cyan", bold: true }, state.heroName),
+              h(Text, { color: "white" }, `$${state.stack}`),
+              h(Text, { dimColor: true }, `(${state.position})`),
+              state.dealerIsHero ? h(DealerBtn, {}) : null,
+            ),
+          ),
+        ),
+
+        // ── action area ──
+        state.pendingAction
+          ? h(Box, { flexDirection: "column", marginTop: 0, alignItems: "center" },
+              // main action buttons
+              h(Box, { flexDirection: "row", justifyContent: "center" },
+                state.toCall > 0
+                  ? h(Btn, { label: "FOLD", hotkey: "f", active: can("fold"), color: "red" })
+                  : null,
+                state.toCall > 0
+                  ? h(Btn, { label: `CALL $${state.toCall}`, hotkey: "c", active: can("call") })
+                  : h(Btn, { label: "CHECK", hotkey: "c", active: can("check") }),
+                can("bet")
+                  ? h(Btn, { label: `BET ${betAmountLabel}`, hotkey: "b", active: true, color: state.betInputMode ? "yellow" : "cyan" })
+                  : null,
+                can("raise")
+                  ? h(Btn, { label: `RAISE ${betAmountLabel}`, hotkey: "r", active: true, color: state.betInputMode ? "yellow" : "cyan" })
+                  : null,
+                h(Btn, { label: "ALL-IN", hotkey: "a", active: can("all-in"), color: "magenta" }),
+              ),
+              // sizing chips
+              (can("bet") || can("raise"))
+                ? h(Box, { flexDirection: "column", alignItems: "center", marginTop: 0 },
+                    h(Box, { flexDirection: "row", justifyContent: "center" },
+                      ...presets.map((p, i) => h(Chip, { key: `p${i}`, label: p.label, amount: p.amount, selected: !state.betInputMode && i === state.selectedPreset })),
+                    ),
+                    state.betInputMode
+                      ? h(Box, { flexDirection: "row", marginTop: 0, gap: 1 },
+                          h(Text, { color: "yellow" }, "Custom: "),
+                          h(Box, { borderStyle: "round", borderColor: "yellow", paddingX: 1 },
+                            h(Text, { color: "yellow", bold: true }, `$${state.customBetInput}_`)),
+                          h(Text, { dimColor: true }, "ENTER=confirm  ESC=cancel"),
+                        )
+                      : h(Text, { dimColor: true }, "type digits for custom amount  [ ] to cycle presets"),
+                  )
+                : null,
+              h(Text, { dimColor: true }, "ENTER=call/check  f c b r a  q=quit"),
+            )
+          : h(Box, { marginTop: 1, justifyContent: "center" },
+              h(Box, { flexDirection: "row", gap: 2 },
+                h(Text, { color: "green", bold: true }, `W ${state.heroWins}`),
+                h(Text, { color: "red", bold: true }, `L ${state.villainWins}`),
+                h(Text, { dimColor: true }, `${state.handsCompleted} hands`),
+                h(Text, { dimColor: true }, "Waiting for your turn...  q=quit"),
+              ),
+            ),
       ),
-      h(
-        Box,
-        { flexDirection: "row" },
-        h(
-          Box,
-          { width: leftWidth, flexDirection: "column", borderStyle: "round", borderColor: "cyan", paddingX: 1 },
-          h(Text, { bold: true }, `Table ${state.tableId}`),
-          h(Text, null, `Street ${streetLabel(state.stage)}   Hand ${state.handNumber}   Position ${state.position}`),
-          h(Text, null, `Pot ${state.pot}   To call ${state.toCall}   Stack ${state.stack}`),
-          h(Text, null, `Clock ${state.timeRemaining}s   Time bank ${state.timeBankRemaining}s   Players ${state.playersInHand}`),
-          h(Text, null, ""),
-          h(Text, { color: "green", bold: true }, `You: ${prettyCards(state.heroCards)}`),
-          h(Text, { color: "yellow", bold: true }, `Board: ${prettyCards(state.board)}`),
-          h(Text, null, ""),
-          h(Text, { color: "magenta" }, `Opponent: ${state.villain.name}${state.villain.profile ? ` (${state.villain.profile})` : ""}`),
-          h(Text, null, `Opponent stack: ${state.villain.stack}`),
-          h(Text, null, `Opponent cards: ${opponentCardsText}`),
-          h(Text, null, ""),
-          h(Text, { color: state.pendingAction ? "magenta" : "gray" }, `Legal: ${state.availableActions.join(", ") || "waiting"}`),
-          h(Text, { color: "green" }, `Sizing: ${actionBar}`),
-          h(Text, { dimColor: true }, actionHint(state)),
-          h(Text, null, ""),
-          h(Text, { bold: true }, `Score  You ${state.heroWins}  Opponent ${state.villainWins}  Completed ${state.handsCompleted}`),
-          h(Text, { dimColor: true }, `Last pot: ${state.lastPot}`),
+
+      // ── RIGHT: activity log drawer ──
+      h(Box, {
+        flexDirection: "column",
+        width: LOG_WIDTH,
+        borderStyle: "single",
+        borderColor: "gray",
+        paddingX: 1,
+      },
+        h(Box, { marginBottom: 1, justifyContent: "space-between" },
+          h(Text, { bold: true, color: "white" }, "ACTIVITY"),
+          h(Box, { flexDirection: "row", gap: 2 },
+            h(Text, { color: "green", bold: true }, `W${state.heroWins}`),
+            h(Text, { color: "red", bold: true }, `L${state.villainWins}`),
+          ),
         ),
-        h(Box, { width: 1 }, h(Text, null, " ")),
-        h(
-          Box,
-          { width: rightWidth, flexDirection: "column", borderStyle: "round", borderColor: "magenta", paddingX: 1 },
-          h(Text, { bold: true }, "Hand feed"),
-          ...feedLines.map((line, index) => h(Text, { key: `${tick}-${index}`, wrap: "truncate-end" }, line)),
-          h(Text, null, ""),
-          h(Text, { color: "green" }, `Selected size: ${preset.label} = ${preset.amount}`),
-        ),
+        ...state.feed.map((entry, index) =>
+          h(Text, {
+            key: `f${tick}-${index}`,
+            wrap: "wrap",
+            color: entry.color,
+            bold: entry.bold,
+            dimColor: entry.dim || (!entry.color && !entry.bold && index > 0),
+          }, entry.text)),
       ),
     )
   }
 
+  // Clear the terminal before rendering
+  process.stdout.write('\x1B[2J\x1B[H')
+
   await ink.render(h(App))
+  rerender = () => ink.rerender(h(App))
+  // Catch any messages received before rerender was wired
+  if (renderTick > 0) rerender()
   await ink.waitUntilExit()
   await cleanup()
 }

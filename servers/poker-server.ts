@@ -3950,6 +3950,17 @@ export class PokerServerRuntime {
         position: tablePositionName(player.seat, table),
         playersInHand: activeCount,
         availableActions: this.legalActionsFor(game, player.botId),
+        players: table.players.map((p) => {
+          const gp = game.players.find((entry) => entry.id === p.botId)
+          return {
+            botId: p.botId,
+            name: p.name,
+            seat: p.seat,
+            stack: gp?.stack ?? p.stack,
+            isHouseBot: p.isHouseBot,
+            connected: p.connected,
+          }
+        }),
       })
     }
 
@@ -4141,6 +4152,22 @@ export class PokerServerRuntime {
     for (const botId of [...runtime.pendingKick]) {
       await this.forceLeaveBotFromTable(botId, tableId, "post-hand-kick")
       runtime.pendingKick.delete(botId)
+    }
+
+    // Auto-rebuy busted players on preferredHouseActor tables so play continues
+    const tableForRebuy = this.tableManager.table(tableId) as PokerTable | undefined
+    if (tableForRebuy?.preferredHouseActor) {
+      for (const player of tableForRebuy.players) {
+        if (player.stack > 0) continue
+        this.tableManager.setPlayerStack(tableId, player.botId, tableForRebuy.startingStack)
+        const walletId = player.isHouseBot ? HOUSE_BANKROLL_ID : player.botId
+        const entryType = player.isHouseBot ? "house_buy_in" as const : "cash_buy_in" as const
+        await this.applyWalletEntry(walletId, entryType, -tableForRebuy.startingStack, {
+          tableId,
+          botId: player.botId,
+          reason: "auto-rebuy",
+        })
+      }
     }
 
     await this.maybeSeedHouseBots(tableId)

@@ -1,11 +1,13 @@
 import { z } from "zod"
 import { FeatureStateSchema, FeatureOptionsSchema } from "@soederpop/luca"
 import { Feature, features } from "@soederpop/luca"
-import { Range, equityEngine } from "@pokurr/core"
+import { Range, equityEngine, analyzeBoard, analyzeDraws, type BoardTexture, type DrawAnalysis } from "@pokurr/core"
 
 import { PRNG } from "../lib/prng"
 import { parseExactHand } from "../lib/cards"
 import { STRATEGY_PROFILES, type PokerPosition as StrategyPokerPosition, type StrategyProfile } from "../lib/strategy-profiles"
+import { sizingForTexture, drawDecisionOverride, cbetDecision, sprAdjustedDecision, PROFILE_PARAMS, turnBarrelDecision, riverDecision, floatDecision, checkRaiseDecision, threeBetResponse } from "../lib/street-logic"
+import type { VillainProfile } from "../lib/opponent-model"
 
 export type PokerAction = "fold" | "check" | "call" | "bet" | "raise" | "all-in"
 export type PokerPosition = StrategyPokerPosition
@@ -26,8 +28,18 @@ export type DecisionContext = {
   facingBet: boolean
   facingRaise: boolean
   facingThreeBet: boolean
+  boardTexture: BoardTexture | null
+  draws: DrawAnalysis | null
+  raiseCount: number
+  streetHistory: Array<{ playerId: string; action: string; amount?: number }>
+  aggressor: string | null
+  isAggressor: boolean
+  spr: number
+  streetIndex: number
   villainCards?: [string, string]
   villainRange?: string
+  villainProfiles: Record<string, VillainProfile>  // keyed by playerId
+  villainProfile: VillainProfile | null             // primary opponent (aggressor or sole villain)
   estimatedEquity: number
   potOdds: number
 }
@@ -148,8 +160,16 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
       ? contextInput.toCall / Math.max(contextInput.potSize + contextInput.toCall, 1)
       : 0
 
+    const isPostflop = contextInput.street !== "preflop" && contextInput.board.length >= 3
+    const boardTexture = isPostflop ? analyzeBoard(contextInput.board) : null
+    const draws = isPostflop && contextInput.heroCards.length === 2
+      ? analyzeDraws(contextInput.heroCards, contextInput.board)
+      : null
+
     const context: DecisionContext = {
       ...contextInput,
+      boardTexture,
+      draws,
       estimatedEquity,
       potOdds,
     }
@@ -204,7 +224,122 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
       : { action: "check", source: "fallback", reasoning: "Unknown profile fallback" }
   }
 
+  private streetLogicOverrides(context: DecisionContext, profileKey: string, rng: PRNG): StrategyDecision | null {
+    const params = PROFILE_PARAMS[profileKey] || PROFILE_PARAMS["balanced"]
+
+    // SPR override (committed zone jam/fold)
+    const sprOverride = sprAdjustedDecision(context.spr, context.estimatedEquity, context.toCall, context.effectiveStack, context.potSize)
+    if (sprOverride) return { ...sprOverride, source: "rules" } as StrategyDecision
+
+    // Draw-aware semibluff
+    if (context.draws) {
+      const drawAction = drawDecisionOverride(context.draws, {
+        equity: context.estimatedEquity,
+        potOdds: context.potOdds,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        inPosition: context.inPosition,
+        street: context.street,
+        effectiveStack: context.effectiveStack,
+        spr: context.spr,
+      }, params.drawAggression, rng)
+      if (drawAction) return { ...drawAction, source: "rules" } as StrategyDecision
+    }
+
+    // C-bet logic (when aggressor and checked to)
+    if (context.isAggressor && context.checkedTo && context.toCall <= 0) {
+      const cbet = cbetDecision(context.boardTexture, context.draws, {
+        equity: context.estimatedEquity,
+        potSize: context.potSize,
+        inPosition: context.inPosition,
+        isAggressor: context.isAggressor,
+        street: context.street,
+      }, params.cbetFreq, rng)
+      if (cbet) return { ...cbet, source: "rules" } as StrategyDecision
+    }
+
+    // 3-bet/4-bet response
+    if (context.facingThreeBet) {
+      const threeBet = threeBetResponse({
+        equity: context.estimatedEquity,
+        potOdds: context.potOdds,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        effectiveStack: context.effectiveStack,
+        facingThreeBet: context.facingThreeBet,
+        raiseCount: context.raiseCount,
+        spr: context.spr,
+      }, params, rng)
+      if (threeBet) return { ...threeBet, source: "rules" } as StrategyDecision
+    }
+
+    // Turn barrel - when aggressor on flop, deciding whether to bet turn
+    if (context.street === "turn" && context.isAggressor && context.toCall <= 0) {
+      const barrel = turnBarrelDecision(context.boardTexture, context.draws, {
+        equity: context.estimatedEquity,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        inPosition: context.inPosition,
+        isAggressor: context.isAggressor,
+        street: context.street,
+        spr: context.spr,
+      }, params, rng)
+      if (barrel) return { ...barrel, source: "rules" } as StrategyDecision
+    }
+
+    // River decision
+    if (context.street === "river") {
+      const river = riverDecision(context.boardTexture, {
+        equity: context.estimatedEquity,
+        potOdds: context.potOdds,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        inPosition: context.inPosition,
+        isAggressor: context.isAggressor,
+        checkedTo: context.checkedTo,
+        facingBet: context.facingBet,
+        facingRaise: context.facingRaise,
+        facingThreeBet: context.facingThreeBet,
+        spr: context.spr,
+      }, params, rng, context.villainProfile)
+      if (river) return { ...river, source: "rules" } as StrategyDecision
+    }
+
+    // Check-raise (OOP facing bet, postflop)
+    if (!context.inPosition && context.toCall > 0 && context.street !== "preflop") {
+      const xr = checkRaiseDecision({
+        equity: context.estimatedEquity,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        inPosition: context.inPosition,
+        facingBet: context.facingBet,
+        street: context.street,
+        spr: context.spr,
+        raiseCount: context.raiseCount,
+      }, params, rng)
+      if (xr) return { ...xr, source: "rules" } as StrategyDecision
+    }
+
+    // Float in position (postflop, not river)
+    if (context.inPosition && context.toCall > 0 && context.street !== "river" && context.street !== "preflop") {
+      const floatAction = floatDecision({
+        equity: context.estimatedEquity,
+        potOdds: context.potOdds,
+        potSize: context.potSize,
+        toCall: context.toCall,
+        inPosition: context.inPosition,
+        street: context.street,
+        facingBet: context.facingBet,
+        spr: context.spr,
+      }, params, rng)
+      if (floatAction) return { ...floatAction, source: "rules" } as StrategyDecision
+    }
+
+    return null
+  }
+
   private randomDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    // Random profile skips street-logic overrides to stay random
     if (context.toCall > 0) {
       const roll = rng.next()
       if (roll < 0.45) {
@@ -226,6 +361,9 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
   }
 
   private tightAggressiveDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "tag", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.12, 0.58)) {
         const raiseTo = Math.max(context.toCall * 2, Math.round(context.potSize * 0.75))
@@ -240,17 +378,20 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.estimatedEquity > 0.6) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.66)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (context.inPosition && context.checkedTo && context.estimatedEquity > 0.45 && rng.next() < 0.4) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.5)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private balancedDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "balanced", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.08, 0.52)) {
         const raiseTo = Math.max(context.toCall * 2.1, Math.round(context.potSize * 0.72))
@@ -269,18 +410,20 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.estimatedEquity > 0.64) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.7)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (context.checkedTo && (context.estimatedEquity > 0.5 || (context.inPosition && rng.next() < 0.28))) {
-      const size = context.estimatedEquity > 0.57 ? 0.58 : 0.45
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * size)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private trickyDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "tricky", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= 0.72) {
         if (rng.next() < 0.45) {
@@ -311,21 +454,24 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.estimatedEquity > 0.68 && rng.next() < 0.55) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.72)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (context.inPosition && context.checkedTo && context.estimatedEquity > 0.47 && rng.next() < 0.33) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.5)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (!context.inPosition && context.checkedTo && context.estimatedEquity > 0.58 && rng.next() < 0.2) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.55)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private pressureDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "pressure", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.04, 0.44)) {
         const raiseTo = Math.max(context.toCall * 2.2, Math.round(context.potSize * 0.82))
@@ -349,18 +495,20 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.checkedTo && (context.estimatedEquity > 0.4 || rng.next() < 0.38)) {
-      const size = context.estimatedEquity > 0.6 ? 0.8 : 0.55
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * size)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (context.estimatedEquity > 0.58) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.68)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private shortStackDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "short-stack", rng)
+    if (override) return override
+
     const shallowPressure = context.effectiveStack <= Math.max(context.potSize * 2.5, context.toCall * 5)
 
     if (context.toCall > 0) {
@@ -380,17 +528,20 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (shallowPressure && (context.estimatedEquity > 0.54 || rng.next() < 0.18)) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.62)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     if (context.checkedTo && context.estimatedEquity > 0.48 && rng.next() < 0.28) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.45)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private loosePassiveDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "loose-passive", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= context.potOdds - 0.03) {
         return { action: "call", amount: context.toCall, source: "rules" }
@@ -404,13 +555,16 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (rng.next() < 0.15 && context.estimatedEquity > 0.5) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.4)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
-  private nitDecision(context: DecisionContext, _rng: PRNG): StrategyDecision {
+  private nitDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "nit", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.20, 0.65)) {
         return { action: "call", amount: context.toCall, source: "rules" }
@@ -425,13 +579,16 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.estimatedEquity > 0.72) {
-      return { action: "bet", amount: Math.max(1, Math.round(context.potSize * 0.6)), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private lagDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "lag", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (context.estimatedEquity >= Math.max(context.potOdds + 0.05, 0.42)) {
         const raiseTo = Math.max(context.toCall * 2, Math.round(context.potSize * 0.75))
@@ -455,16 +612,16 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (context.estimatedEquity > 0.45 || rng.next() < 0.35) {
-      const size = context.estimatedEquity > 0.6
-        ? Math.round(context.potSize * 0.75)
-        : Math.round(context.potSize * 0.5)
-      return { action: "bet", amount: Math.max(1, size), source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
   }
 
   private maniacDecision(context: DecisionContext, rng: PRNG): StrategyDecision {
+    const override = this.streetLogicOverrides(context, "maniac", rng)
+    if (override) return override
+
     if (context.toCall > 0) {
       if (rng.next() < 0.55 && context.toCall < context.effectiveStack * 0.4) {
         const raiseTo = Math.max(context.toCall * 2.5, Math.round(context.potSize * 0.9))
@@ -483,8 +640,7 @@ export class Strategy extends Feature<StrategyState, StrategyOptions> {
     }
 
     if (rng.next() < 0.80) {
-      const size = Math.round(Math.max(context.potSize * 0.8, 1))
-      return { action: "bet", amount: size, source: "rules" }
+      return { action: "bet", amount: sizingForTexture(context.boardTexture, context.estimatedEquity, context.potSize, context.estimatedEquity < 0.50), source: "rules" }
     }
 
     return { action: "check", source: "rules" }
