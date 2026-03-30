@@ -1810,7 +1810,9 @@ async function runJoin(container: AGIContainer & any, options: PokerOptions, arg
       const actor = String(message.payload?.playerName || message.payload?.seat || "player")
       const action = String(message.payload?.action || "")
       const amount = message.payload?.amount !== undefined ? ` ${String(message.payload.amount)}` : ""
-      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`))
+      const reasoning = String(message.payload?.decisionReasoning || "").trim()
+      const suffix = reasoning ? ui.colors.dim(`  — ${reasoning}`) : ""
+      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`) + suffix)
       return
     }
 
@@ -2351,7 +2353,9 @@ async function runDashboard(container: AGIContainer & any, options: PokerOptions
         const actor = String(msg.payload?.playerName || msg.payload?.seat || "player")
         const action = String(msg.payload?.action || "")
         const amount = msg.payload?.amount !== undefined ? ` ${msg.payload.amount}` : ""
-        state.feed.unshift(c.yellow(`♦ ${actor}: ${action}${amount}`))
+        const reasoning = String(msg.payload?.decisionReasoning || "").trim()
+        const suffix = reasoning ? c.gray(` — ${reasoning}`) : ""
+        state.feed.unshift(c.yellow(`♦ ${actor}: ${action}${amount}`) + suffix)
         if (state.feed.length > 50) state.feed.length = 50
         render()
       }
@@ -2611,7 +2615,9 @@ async function runWatch(container: AGIContainer & any, options: PokerOptions, ar
       const actor = String(message.payload?.playerName || message.payload?.seat || "player")
       const action = String(message.payload?.action || "")
       const amount = message.payload?.amount !== undefined ? ` ${String(message.payload.amount)}` : ""
-      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`))
+      const reasoning = String(message.payload?.decisionReasoning || "").trim()
+      const suffix = reasoning ? ui.colors.dim(`  — ${reasoning}`) : ""
+      console.log(ui.colors.yellow(`  ♦ ${actor}: ${action}${amount}`) + suffix)
       return
     }
 

@@ -291,10 +291,12 @@ export async function runPlayMode(
       const action = String(message.payload?.action || "")
       const rawAmount = message.payload?.amount
       const amountStr = rawAmount !== undefined && Number(rawAmount) > 0 ? ` $${rawAmount}` : ""
+      const reasoning = String(message.payload?.decisionReasoning || "").trim()
+      const reasoningStr = reasoning ? ` — ${reasoning}` : ""
       const isHero = playerName === state.heroName || String(message.payload?.playerId || "") === heroBotId
       const label = isHero ? "You" : (playerName || state.villain.name)
       appendFeed(state, {
-        text: `${label}: ${action}${amountStr}`,
+        text: `${label}: ${action}${amountStr}${reasoningStr}`,
         color: isHero ? "cyan" : "white",
       })
     }

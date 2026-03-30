@@ -190,6 +190,7 @@ export interface ActionTakenPayload {
   amount?: number
   auto?: boolean
   reason?: string
+  decisionReasoning?: string
 }
 
 export interface HandResultWinner {

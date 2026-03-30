@@ -164,6 +164,7 @@ type LeaderboardTimeWindow = "all" | "7d" | "30d" | "season"
 type ApplyActionMeta = {
   auto?: boolean
   reason?: string
+  decisionReasoning?: string
 }
 
 type GoldenFixture = {
@@ -224,6 +225,8 @@ type HouseActorContext = {
   bigBlind: number
   playersInHand: number
   board: string[]
+  heroCards: [string, string]
+  opponentBotIds?: string[]
 }
 
 type HouseActorModule = {
@@ -231,6 +234,7 @@ type HouseActorModule = {
   displayName?: string
   description?: string
   profileName?: string
+  init?: (container: any) => Promise<void> | void
   decide?: (context: HouseActorContext) => Promise<HouseActorDecision> | HouseActorDecision
   sourcePath?: string
 }
@@ -599,6 +603,10 @@ export class PokerServerRuntime {
       ...(typeof candidate.profileName === "string" ? { profileName: candidate.profileName } : {}),
     }
 
+    if (typeof candidate.init === "function") {
+      actor.init = candidate.init as HouseActorModule["init"]
+    }
+
     if (typeof candidate.decide === "function") {
       actor.decide = candidate.decide as HouseActorModule["decide"]
     }
@@ -608,9 +616,28 @@ export class PokerServerRuntime {
 
   private async loadHouseActors(): Promise<void> {
     if (isStandaloneMode(this.container)) {
-      return this.loadEmbeddedHouseActors()
+      this.loadEmbeddedHouseActors()
+    } else {
+      await this.loadHouseActorsFromDisk()
     }
-    return this.loadHouseActorsFromDisk()
+    await this.initializeHouseActors()
+  }
+
+  private async initializeHouseActors(): Promise<void> {
+    for (const actor of this.houseActors.values()) {
+      if (typeof actor.init !== "function") {
+        continue
+      }
+
+      try {
+        await actor.init(this.container)
+      } catch (error: any) {
+        this.houseActorLoadErrors.push({
+          path: String(actor.sourcePath || actor.id),
+          error: `init failed: ${String(error?.message || error)}`,
+        })
+      }
+    }
   }
 
   private loadEmbeddedHouseActors(): void {
@@ -624,6 +651,7 @@ export class PokerServerRuntime {
         displayName: actor.displayName,
         description: actor.description,
         profileName: actor.profileName,
+        init: (actor as any).init,
         decide: actor.decide,
         sourcePath: "(embedded)",
       })
@@ -3561,6 +3589,7 @@ export class PokerServerRuntime {
       let action: string
       let amount: number | undefined
       let reasonSuffix = "profile"
+      let decisionReasoning: string | undefined
 
       if (typeof actorModule?.decide === "function") {
         const custom = await actorModule.decide({
@@ -3578,12 +3607,21 @@ export class PokerServerRuntime {
           bigBlind: game.bigBlind,
           playersInHand: activePlayers.length,
           board: [...game.board],
+          heroCards,
+          opponentBotIds: activePlayers
+            .map((entry) => String(entry.id))
+            .filter((entryId) => entryId !== botId),
         })
 
         if (isRecord(custom) && typeof custom.action === "string") {
           action = custom.action
           const rawAmount = Number(custom.amount)
           amount = Number.isFinite(rawAmount) ? rawAmount : undefined
+          if (typeof custom.reasoning === "string" && custom.reasoning.trim().length > 0) {
+            decisionReasoning = custom.reasoning.trim()
+          } else if (typeof custom.reason === "string" && custom.reason.trim().length > 0) {
+            decisionReasoning = custom.reason.trim()
+          }
           reasonSuffix = "actor"
         } else {
           const fallback = toCall > 0 ? "fold" : "check"
@@ -3616,6 +3654,7 @@ export class PokerServerRuntime {
       await this.applyAction(tableId, botId, action, amount, {
         auto: true,
         reason: `house-${actorId}-${reasonSuffix}`,
+        ...(decisionReasoning ? { decisionReasoning } : {}),
       })
     } catch {
       // Fallback if strategy fails
@@ -3779,6 +3818,7 @@ export class PokerServerRuntime {
       ...(lastAction?.amount !== undefined ? { amount: lastAction.amount } : {}),
       auto: meta.auto === true,
       ...(meta.reason ? { reason: meta.reason } : {}),
+      ...(meta.decisionReasoning ? { decisionReasoning: meta.decisionReasoning } : {}),
     })
     this.broadcastToSpectators(tableId, "action_taken", {
       tableId,
@@ -3788,6 +3828,7 @@ export class PokerServerRuntime {
       ...(lastAction?.amount !== undefined ? { amount: lastAction.amount } : {}),
       auto: meta.auto === true,
       ...(meta.reason ? { reason: meta.reason } : {}),
+      ...(meta.decisionReasoning ? { decisionReasoning: meta.decisionReasoning } : {}),
     })
 
     if (this.shouldFinalize(after)) {

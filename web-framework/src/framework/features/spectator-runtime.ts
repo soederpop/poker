@@ -278,7 +278,9 @@ export class SpectatorRuntime extends Feature<SpectatorRuntimeState, SpectatorRu
     if (message.type === "action_taken") {
       const actionPayload = payload as unknown as ActionTakenPayload
       const playerName = actionPayload.playerName || `Seat ${actionPayload.seat || "?"}`
-      this.appendFeed(`${playerName} ${actionPayload.action}${actionPayload.amount ? ` ${actionPayload.amount}` : ""}`)
+      const reasoning = String(actionPayload.decisionReasoning || "").trim()
+      const suffix = reasoning ? ` — ${reasoning}` : ""
+      this.appendFeed(`${playerName} ${actionPayload.action}${actionPayload.amount ? ` ${actionPayload.amount}` : ""}${suffix}`)
       return
     }
 
