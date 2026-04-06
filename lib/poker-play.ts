@@ -29,8 +29,6 @@ type SeatSnapshot = {
   botId?: string
   name: string
   stack: number
-  profile?: string
-  isHouseBot?: boolean
   isHero?: boolean
 }
 
@@ -143,8 +141,6 @@ function syncTablePlayers(state: PlayState, payload: any, heroBotId: string) {
     botId: String(villain.botId || state.villain.botId || "").trim() || undefined,
     name: String(villain.name || state.villain.name || "Opponent"),
     stack: Number(villain.stack || state.villain.stack || 0),
-    profile: typeof villain.profile === "string" ? villain.profile : state.villain.profile,
-    isHouseBot: Boolean(villain.isHouseBot),
   }
 }
 
@@ -192,7 +188,6 @@ export async function runPlayMode(
     startingStack: 120,
     maxPlayers: 2,
     actionTimeout: Math.max(8, Number(options.actionTimeout || 20)),
-    preferredHouseActor: opponent,
   })
   const created = await heroClient.waitFor("table_created", 10_000)
   const tableId = String(created.payload?.id || "")
@@ -216,8 +211,6 @@ export async function runPlayMode(
     villain: {
       name: `Bot ${opponent}`,
       stack: 0,
-      profile: opponent,
-      isHouseBot: false,
     },
     villainCards: [],
     revealOpponentHolecards: options.viewOpponentHolecards === true,

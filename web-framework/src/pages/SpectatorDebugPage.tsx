@@ -57,7 +57,6 @@ export function SpectatorDebugPage({ route }: { route: HashRoute }) {
                 player.inHand === false ? "out" : "",
                 player.folded ? "folded" : "",
                 player.allIn ? "all-in" : "",
-                player.isHouseBot ? "house" : "",
               ].filter(Boolean).join(" · ")
 
               return (

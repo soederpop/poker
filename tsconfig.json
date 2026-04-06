@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "commands/**/*.ts",
+    "features/**/*.ts",
+    "lib/**/*.ts",
+    "scripts/**/*.ts",
+    "servers/**/*.ts",
+    "clients/**/*.ts",
+    "assistants/**/*.ts",
+    "test/**/*.ts",
+    "container.ts",
+    "luca.cli.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages",
+    "web",
+    "web-framework",
+    "hermes-bot-exsy8u",
+    "tmp"
+  ]
+}

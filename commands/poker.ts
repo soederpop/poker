@@ -52,15 +52,13 @@ export const argsSchema = CommandOptionsSchema.extend({
   wsPort: z.coerce.number().int().min(1).max(65535).optional().describe("Deprecated: ws port is derived as --port + 1"),
   spectatorPort: z.coerce.number().int().min(1).max(65535).optional().describe("Deprecated: spectator ws port is derived as --port + 2"),
   defaultTable: booleanOption(true).describe("Serve mode: create default cash tables on startup"),
-  seedLobby: booleanOption(true).describe("Serve mode: seed SNG presets + house bots"),
+  seedLobby: booleanOption(true).describe("Serve mode: seed SNG table presets on startup"),
   actionTimeout: z.coerce.number().int().min(1).default(30).describe("Serve mode: default action clock seconds"),
   timeBankStartSeconds: z.coerce.number().int().min(0).default(120).describe("Serve mode: starting time bank per player"),
   timeBankCapSeconds: z.coerce.number().int().min(0).default(120).describe("Serve mode: max time bank"),
   timeBankAccrualSeconds: z.coerce.number().int().min(0).default(5).describe("Serve mode: time-bank accrual after each hand"),
-  botThinkDelayMinMs: z.coerce.number().int().min(0).default(1200).describe("Serve mode: house-bot minimum think delay (ms)"),
-  botThinkDelayMaxMs: z.coerce.number().int().min(0).default(2600).describe("Serve mode: house-bot maximum think delay (ms)"),
   reconnectGraceMs: z.coerce.number().int().min(1000).default(45_000).describe("Serve mode: reconnect window in ms"),
-  houseActorsPath: z.string().default("house/actors").describe("Serve mode: relative path to disk-backed house actor modules"),
+  houseActorsPath: z.string().default("house/actors").describe("Agent scaffold: path to house actor templates"),
   token: z.string().optional().describe("Bearer token for join mode"),
   name: z.string().optional().describe("Bot name for register/auto-register"),
   server: z.string().optional().describe("HTTP server base URL, e.g. http://localhost:3000"),
@@ -1509,10 +1507,7 @@ async function runServe(container: AGIContainer & any, options: PokerOptions) {
     timeBankStartSeconds: options.timeBankStartSeconds,
     timeBankCapSeconds: options.timeBankCapSeconds,
     timeBankAccrualSeconds: options.timeBankAccrualSeconds,
-    botThinkDelayMinMs: options.botThinkDelayMinMs,
-    botThinkDelayMaxMs: options.botThinkDelayMaxMs,
     reconnectGraceMs: options.reconnectGraceMs,
-    houseActorsPath: options.houseActorsPath,
   })
 
   await runtime.start()
@@ -2166,7 +2161,6 @@ function renderLobby(state: DashboardState, c: any, cols: number): string {
         const stackStr = c.green(String(p.stack || 0).padStart(8))
         const seatStr = c.dim(`Seat ${p.seat}`.padEnd(8))
         const flags = [
-          p.isHouseBot ? c.dim("🤖") : "",
           p.connected === false ? c.red("DC") : "",
         ].filter(Boolean).join(" ")
         lines.push(`    ${seatStr} ${nameStr} ${stackStr}  ${flags}`)

@@ -28,7 +28,6 @@ export function avatarObjectPosition(player: Pick<SpectatorPlayerSnapshot, "botI
 
 export function playerTags(player: SpectatorPlayerSnapshot) {
   const tags: string[] = []
-  if (player.isHouseBot) tags.push("house")
   if (player.connected === false) tags.push("offline")
   if (player.folded) tags.push("folded")
   if (player.allIn) tags.push("all-in")

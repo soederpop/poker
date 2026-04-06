@@ -14,7 +14,7 @@
     "compile": "bun run inline-wasm && bun run inline-house-actors && bun build src/cli.ts --compile --outfile dist/pokurr --external node-llama-cpp --define 'process.env.POKURR_COMPILED=\"true\"'"
   },
   "dependencies": {
-    "@soederpop/luca": ">=0.1.1"
+    "@soederpop/luca": ">=0.1.2"
   },
   "luca": {
     "aliases": ["luca-poker", "poker", "poker app", "poker playground"]

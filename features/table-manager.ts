@@ -4,15 +4,14 @@ import { Feature, features, FeatureOptionsSchema, FeatureStateSchema } from "@so
 export type TableStatus = "waiting" | "active" | "paused" | "closed"
 
 export type TablePlayer = {
-  botId: string
+  playerId: string
   name: string
   seat: number
   stack: number
   connected: boolean
-  isHouseBot: boolean
-  profile?: string
   joinedAt: number
   updatedAt: number
+  metadata?: Record<string, unknown>
 }
 
 export type PokerTable = {
@@ -23,7 +22,6 @@ export type PokerTable = {
   startingStack: number
   maxPlayers: number
   actionTimeout: number
-  preferredHouseActor?: string
   status: TableStatus
   players: TablePlayer[]
   createdAt: number
@@ -127,7 +125,6 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     startingStack?: number
     maxPlayers?: number
     actionTimeout?: number
-    preferredHouseActor?: string
   }): PokerTable {
     const [smallBlind, bigBlind] = options.blinds
     const now = Date.now()
@@ -140,7 +137,6 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
       startingStack: options.startingStack ?? this.options.defaultStartingStack,
       maxPlayers: options.maxPlayers ?? this.options.defaultMaxPlayers,
       actionTimeout: options.actionTimeout ?? this.options.defaultActionTimeout,
-      ...(options.preferredHouseActor ? { preferredHouseActor: options.preferredHouseActor } : {}),
       status: "waiting",
       players: [],
       createdAt: now,
@@ -156,8 +152,8 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     return this.tables.find((entry) => entry.id === tableId)
   }
 
-  tableForBot(botId: string): PokerTable | undefined {
-    return this.tables.find((table) => table.players.some((player) => player.botId === botId))
+  tableForPlayer(playerId: string): PokerTable | undefined {
+    return this.tables.find((table) => table.players.some((player) => player.playerId === playerId))
   }
 
   chooseJoinableTable(): PokerTable | undefined {
@@ -165,14 +161,14 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     return open.find((table) => table.players.length < table.maxPlayers)
   }
 
-  markDisconnected(botId: string): PokerTable | null {
-    const table = this.tableForBot(botId)
+  markDisconnected(playerId: string): PokerTable | null {
+    const table = this.tableForPlayer(playerId)
     if (!table) {
       return null
     }
 
     return this.updateTable(table.id, (next) => {
-      next.players = next.players.map((player) => player.botId === botId
+      next.players = next.players.map((player) => player.playerId === playerId
         ? { ...player, connected: false, updatedAt: Date.now() }
         : player)
       next.status = next.players.length >= 2 ? "active" : "paused"
@@ -180,14 +176,14 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     })
   }
 
-  markConnected(botId: string): PokerTable | null {
-    const table = this.tableForBot(botId)
+  markConnected(playerId: string): PokerTable | null {
+    const table = this.tableForPlayer(playerId)
     if (!table) {
       return null
     }
 
     return this.updateTable(table.id, (next) => {
-      next.players = next.players.map((player) => player.botId === botId
+      next.players = next.players.map((player) => player.playerId === playerId
         ? { ...player, connected: true, updatedAt: Date.now() }
         : player)
       next.status = next.players.length >= 2 ? "active" : "waiting"
@@ -197,12 +193,11 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
 
   joinTable(options: {
     tableId: string
-    botId: string
+    playerId: string
     name: string
     seatPreference?: number
     stack?: number
-    isHouseBot?: boolean
-    profile?: string
+    metadata?: Record<string, unknown>
   }): { table: PokerTable; player: TablePlayer; wasAlreadySeated: boolean } {
     const table = this.table(options.tableId)
     if (!table) {
@@ -213,10 +208,10 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
       throw new Error(`Table is closed: ${options.tableId}`)
     }
 
-    const existing = table.players.find((player) => player.botId === options.botId)
+    const existing = table.players.find((player) => player.playerId === options.playerId)
     if (existing) {
-      const updated = this.markConnected(options.botId) || table
-      const refreshed = updated.players.find((player) => player.botId === options.botId) || existing
+      const updated = this.markConnected(options.playerId) || table
+      const refreshed = updated.players.find((player) => player.playerId === options.playerId) || existing
       return { table: updated, player: refreshed, wasAlreadySeated: true }
     }
 
@@ -249,15 +244,14 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
 
     const now = Date.now()
     const newPlayer: TablePlayer = {
-      botId: options.botId,
+      playerId: options.playerId,
       name: options.name,
       seat,
       stack: options.stack ?? table.startingStack,
       connected: true,
-      isHouseBot: options.isHouseBot === true,
-      ...(options.profile ? { profile: options.profile } : {}),
       joinedAt: now,
       updatedAt: now,
+      ...(options.metadata ? { metadata: options.metadata } : {}),
     }
 
     const updated = this.updateTable(table.id, (next) => {
@@ -270,15 +264,15 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     return { table: updated, player: newPlayer, wasAlreadySeated: false }
   }
 
-  leaveTable(tableId: string, botId: string): { table: PokerTable; player: TablePlayer | null } {
+  leaveTable(tableId: string, playerId: string): { table: PokerTable; player: TablePlayer | null } {
     const table = this.table(tableId)
     if (!table) {
       throw new Error(`Table not found: ${tableId}`)
     }
 
-    const existing = table.players.find((player) => player.botId === botId) || null
+    const existing = table.players.find((player) => player.playerId === playerId) || null
     const updated = this.updateTable(tableId, (next) => {
-      next.players = next.players.filter((player) => player.botId !== botId)
+      next.players = next.players.filter((player) => player.playerId !== playerId)
       next.status = next.players.length >= 2 ? "active" : "paused"
       return next
     })
@@ -294,18 +288,18 @@ export class TableManager extends Feature<TableManagerState, TableManagerOptions
     }))
   }
 
-  setPlayerStack(tableId: string, botId: string, stack: number): PokerTable {
+  setPlayerStack(tableId: string, playerId: string, stack: number): PokerTable {
     return this.updateTable(tableId, (next) => {
-      next.players = next.players.map((player) => player.botId === botId
+      next.players = next.players.map((player) => player.playerId === playerId
         ? { ...player, stack: Math.max(0, stack), updatedAt: Date.now() }
         : player)
       return next
     })
   }
 
-  setPlayerConnected(tableId: string, botId: string, connected: boolean): PokerTable {
+  setPlayerConnected(tableId: string, playerId: string, connected: boolean): PokerTable {
     return this.updateTable(tableId, (next) => {
-      next.players = next.players.map((player) => player.botId === botId
+      next.players = next.players.map((player) => player.playerId === playerId
         ? { ...player, connected, updatedAt: Date.now() }
         : player)
       return next

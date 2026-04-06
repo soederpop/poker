@@ -1,19 +1,14 @@
 import type { AGIContainer } from "@soederpop/luca/agi"
-import { isStandaloneMode } from "../container"
-import { getEmbeddedHouseActorsMap } from "../src/generated/house-actors"
-
 import {
   applyEvent,
   createInitialGameState,
   playersInHand,
-  sortedSeats,
   toCallForPlayer,
   type GameEvent,
   type GameState,
   type PlayerActionType,
 } from "../features/game-engine"
 import type { PokerTable } from "../features/table-manager"
-import type { PokerPosition, Strategy } from "../features/strategy"
 
 type WalletLedgerType =
   | "register_credit"
@@ -128,7 +123,6 @@ type HandHistoryRecord = {
     seat: number
     stack: number
     cards?: [string, string] | []
-    isHouseBot?: boolean
   }>
   actions: Array<{
     seq: number
@@ -202,52 +196,8 @@ type GoldenFixtureReplay = {
 }
 
 type PlayerAction = Exclude<PlayerActionType, "small-blind" | "big-blind">
-type HouseActorAction = PlayerAction
-
-type HouseActorDecision = {
-  action: HouseActorAction
-  amount?: number
-  reasoning?: string
-}
-
-type HouseActorContext = {
-  actorId: string
-  botId: string
-  tableId: string
-  stage: "preflop" | "flop" | "turn" | "river"
-  position: PokerPosition
-  legalActions: HouseActorAction[]
-  toCall: number
-  potSize: number
-  stack: number
-  currentBet: number
-  smallBlind: number
-  bigBlind: number
-  playersInHand: number
-  board: string[]
-  heroCards: [string, string]
-  opponentBotIds?: string[]
-}
-
-type HouseActorModule = {
-  id: string
-  displayName?: string
-  description?: string
-  profileName?: string
-  init?: (container: any) => Promise<void> | void
-  decide?: (context: HouseActorContext) => Promise<HouseActorDecision> | HouseActorDecision
-  sourcePath?: string
-}
-
-type HouseActorLoadError = {
-  path: string
-  error: string
-}
 
 const PLAYER_ACTIONS: PlayerAction[] = ["fold", "check", "call", "bet", "raise", "all-in"]
-const DEFAULT_HOUSE_ACTOR_IDS = ["nit", "tag", "lag", "calling-station", "maniac"] as const
-const HOUSE_BANKROLL_ID = "house_bankroll"
-const HOUSE_BANKROLL_INITIAL = 10_000_000
 
 export type PokerServerOptions = {
   host?: string
@@ -265,9 +215,6 @@ export type PokerServerOptions = {
   timeBankAccrualSeconds?: number
   showdownRevealMs?: number
   nonShowdownRevealMs?: number
-  botThinkDelayMinMs?: number
-  botThinkDelayMaxMs?: number
-  houseActorsPath?: string
 }
 
 const SPECTATOR_CARD_POLICY = "reveal-on-showdown"
@@ -357,14 +304,6 @@ function startOfCurrentYearUtcTs(now: number): number {
   return Date.UTC(date.getUTCFullYear(), 0, 1, 0, 0, 0, 0)
 }
 
-function isSngTable(table: PokerTable): boolean {
-  return table.name.toLowerCase().startsWith("sng ")
-}
-
-function isShowcaseTable(table: PokerTable): boolean {
-  return table.name.toLowerCase().startsWith("showcase bots")
-}
-
 function tablePositionName(seat: number, table: PokerTable): string {
   const players = [...table.players].sort((a, b) => a.seat - b.seat)
   const idx = players.findIndex((entry) => entry.seat === seat)
@@ -404,7 +343,6 @@ export class PokerServerRuntime {
   private _startedAt = 0
   private _lastHeartbeatAt = 0
   private _heartbeat?: ReturnType<typeof setInterval>
-  private _houseCursor = 0
   private _adminIpc?: any
   private _adminSocketPath?: string
 
@@ -419,8 +357,6 @@ export class PokerServerRuntime {
   private readonly refreshTokens = new Map<string, string>()
   private readonly wallets = new Map<string, WalletState>()
   private readonly runtimes = new Map<string, TableRuntime>()
-  private readonly houseActors = new Map<string, HouseActorModule>()
-  private readonly houseActorLoadErrors: HouseActorLoadError[] = []
   private goldenFixturesCache: GoldenFixture[] | null = null
   private readonly goldenFixtureReplayCache = new Map<string, GoldenFixtureReplay>()
 
@@ -486,20 +422,6 @@ export class PokerServerRuntime {
     return Math.max(250, Math.floor(this.options.nonShowdownRevealMs ?? 1200))
   }
 
-  get botThinkDelayMinMs(): number {
-    return Math.max(0, Math.floor(this.options.botThinkDelayMinMs ?? 1200))
-  }
-
-  get botThinkDelayMaxMs(): number {
-    const max = Math.max(0, Math.floor(this.options.botThinkDelayMaxMs ?? 2600))
-    return Math.max(this.botThinkDelayMinMs, max)
-  }
-
-  get houseActorsPath(): string {
-    const raw = String(this.options.houseActorsPath || "house/actors").trim()
-    return raw.length > 0 ? raw : "house/actors"
-  }
-
   get serverId(): string {
     if (!this._serverId) {
       const signature = this.container.utils.hashObject({
@@ -557,14 +479,6 @@ export class PokerServerRuntime {
     return this._spectatorWs
   }
 
-  private listHouseActorIds(): string[] {
-    if (this.houseActors.size > 0) {
-      return [...this.houseActors.keys()].sort()
-    }
-
-    return [...DEFAULT_HOUSE_ACTOR_IDS]
-  }
-
   private async resolveWorkspacePath(pathLike: string): Promise<string> {
     const fs = this.container.feature("fs", { enable: true })
     const target = String(pathLike || "").trim()
@@ -581,153 +495,10 @@ export class PokerServerRuntime {
     return direct
   }
 
-  private normalizeHouseActor(
-    candidate: unknown,
-    fallbackId: string,
-    sourcePath: string,
-  ): HouseActorModule | null {
-    if (!isRecord(candidate)) {
-      return null
-    }
-
-    const rawId = String(candidate.id || fallbackId).trim()
-    if (!rawId) {
-      return null
-    }
-
-    const actor: HouseActorModule = {
-      id: rawId,
-      sourcePath,
-      ...(typeof candidate.displayName === "string" ? { displayName: candidate.displayName } : {}),
-      ...(typeof candidate.description === "string" ? { description: candidate.description } : {}),
-      ...(typeof candidate.profileName === "string" ? { profileName: candidate.profileName } : {}),
-    }
-
-    if (typeof candidate.init === "function") {
-      actor.init = candidate.init as HouseActorModule["init"]
-    }
-
-    if (typeof candidate.decide === "function") {
-      actor.decide = candidate.decide as HouseActorModule["decide"]
-    }
-
-    return actor
-  }
-
-  private async loadHouseActors(): Promise<void> {
-    if (isStandaloneMode(this.container)) {
-      this.loadEmbeddedHouseActors()
-    } else {
-      await this.loadHouseActorsFromDisk()
-    }
-    await this.initializeHouseActors()
-  }
-
-  private async initializeHouseActors(): Promise<void> {
-    for (const actor of this.houseActors.values()) {
-      if (typeof actor.init !== "function") {
-        continue
-      }
-
-      try {
-        await actor.init(this.container)
-      } catch (error: any) {
-        this.houseActorLoadErrors.push({
-          path: String(actor.sourcePath || actor.id),
-          error: `init failed: ${String(error?.message || error)}`,
-        })
-      }
-    }
-  }
-
-  private loadEmbeddedHouseActors(): void {
-    this.houseActors.clear()
-    this.houseActorLoadErrors.length = 0
-
-    const embedded = getEmbeddedHouseActorsMap()
-    for (const [id, actor] of embedded) {
-      this.houseActors.set(id, {
-        id: actor.id,
-        displayName: actor.displayName,
-        description: actor.description,
-        profileName: actor.profileName,
-        init: (actor as any).init,
-        decide: actor.decide,
-        sourcePath: "(embedded)",
-      })
-    }
-  }
-
-  private async loadHouseActorsFromDisk(): Promise<void> {
-    this.houseActors.clear()
-    this.houseActorLoadErrors.length = 0
-
-    const fs = this.container.feature("fs", { enable: true })
-    const absoluteRoot = await this.resolveWorkspacePath(this.houseActorsPath)
-    const rootExists = await fs.existsAsync(absoluteRoot)
-
-    if (!rootExists) {
-      this.houseActorLoadErrors.push({
-        path: absoluteRoot,
-        error: `house actor path does not exist (${this.houseActorsPath})`,
-      })
-      return
-    }
-
-    const walked = await fs.walkAsync(absoluteRoot, { files: true, directories: false })
-    const files = walked.files
-      .filter((entry) => {
-        const lowered = String(entry).toLowerCase()
-        return (
-          (lowered.endsWith(".ts") || lowered.endsWith(".js") || lowered.endsWith(".mjs"))
-          && !lowered.endsWith(".d.ts")
-        )
-      })
-      .sort((a, b) => String(a).localeCompare(String(b)))
-
-    for (const filePath of files) {
-      const parsed = this.container.paths.parse(String(filePath))
-      const fallbackId = String(parsed.name || "").trim()
-
-      if (!fallbackId || fallbackId.startsWith("_")) {
-        continue
-      }
-
-      try {
-        const specifier = new URL(`file://${String(filePath)}`)
-        specifier.searchParams.set("v", String(nowTs()))
-        const imported = await import(specifier.href)
-        const candidate = imported.default ?? imported.houseActor ?? imported
-        const actor = this.normalizeHouseActor(candidate, fallbackId, String(filePath))
-
-        if (!actor) {
-          this.houseActorLoadErrors.push({
-            path: String(filePath),
-            error: "missing actor export (expected default export object with id)",
-          })
-          continue
-        }
-
-        this.houseActors.set(actor.id, actor)
-      } catch (error: any) {
-        this.houseActorLoadErrors.push({
-          path: String(filePath),
-          error: String(error?.message || error),
-        })
-      }
-    }
-  }
-
   private houseStatusSnapshot() {
     const status = this._started && !this._stopping ? "up" : "down"
     const now = nowTs()
     const tables = this.tableManager.tables as PokerTable[]
-    const houseTablePlayers = tables.flatMap((table) => table.players.filter((player) => player.isHouseBot))
-    const houseByActor: Record<string, number> = {}
-    for (const player of houseTablePlayers) {
-      const actorId = String(player.profile || "unknown")
-      houseByActor[actorId] = (houseByActor[actorId] || 0) + 1
-    }
 
     return {
       status,
@@ -740,12 +511,6 @@ export class PokerServerRuntime {
         ws: `ws://localhost:${this.wsPort}`,
         spectatorWs: this.spectatorPort ? `ws://localhost:${this.spectatorPort}` : null,
       },
-      actorRegistry: {
-        path: this.houseActorsPath,
-        loaded: this.houseActors.size,
-        actorIds: this.listHouseActorIds(),
-        loadErrors: this.houseActorLoadErrors,
-      },
       connections: {
         authenticatedAgents: [...this.sessions.values()].filter((session) => session.authenticated).length,
         spectators: this.spectatorSessions.size,
@@ -755,11 +520,6 @@ export class PokerServerRuntime {
         active: tables.filter((table) => table.status === "active").length,
         waiting: tables.filter((table) => table.status === "waiting").length,
         paused: tables.filter((table) => table.status === "paused").length,
-      },
-      houseBots: {
-        registered: [...this.bots.values()].filter((bot) => isRecord(bot.metadata) && bot.metadata?.houseBot === true).length,
-        seated: houseTablePlayers.length,
-        byActor: houseByActor,
       },
       heartbeat: {
         intervalMs: 15000,
@@ -1110,8 +870,6 @@ export class PokerServerRuntime {
     }
 
     await this.loadIdentityState()
-    await this.loadHouseActors()
-    this.ensureHouseBankroll()
     this.setupHttpEndpoints()
     this.setupWebsocketHandlers()
     this.setupSpectatorWebsocketHandlers()
@@ -1151,7 +909,6 @@ export class PokerServerRuntime {
       console.log(`[poker-server] spectator card policy: ${SPECTATOR_CARD_POLICY}`)
     }
     console.log("[poker-server] equity backend: wasm")
-    console.log(`[poker-server] house actors: ${this.listHouseActorIds().join(", ") || "none"}`)
     this.printLobbyInventory()
 
     this._started = true
@@ -1253,96 +1010,6 @@ export class PokerServerRuntime {
     ensureSng("SNG 100", 1, 2, 100)
     ensureSng("SNG 250", 2, 5, 250)
     ensureSng("SNG 500", 5, 10, 500)
-
-    let showcase = (this.tableManager.tables as PokerTable[]).find((table) => table.name === "Showcase Bots 1/2")
-    if (!showcase) {
-      showcase = this.tableManager.createTable({
-        name: "Showcase Bots 1/2",
-        blinds: [1, 2],
-        startingStack: 150,
-        maxPlayers: 6,
-        actionTimeout: this.defaultActionTimeout,
-      }) as PokerTable
-    }
-
-    const refreshed = this.tableManager.table(showcase.id) as PokerTable | undefined
-    if (refreshed) {
-      await this.seedShowcaseTable(refreshed)
-    }
-  }
-
-  private async seedShowcaseTable(table: PokerTable) {
-    const runtime = this.ensureRuntime(table)
-    const targetSeats = Math.max(2, Math.min(6, table.maxPlayers))
-    const missing = Math.max(0, targetSeats - table.players.length)
-
-    for (let i = 0; i < missing; i += 1) {
-      if (!this.addHouseBotToTable(table, runtime)) {
-        break
-      }
-    }
-
-    this.broadcastTables()
-    await this.startHandIfReady(table.id, "showcase-seed")
-  }
-
-  private addHouseBotToTable(table: PokerTable, runtime: TableRuntime): boolean {
-    const actorIds = this.listHouseActorIds()
-    if (actorIds.length <= 0) {
-      return false
-    }
-
-    const preferredActorId = typeof table.preferredHouseActor === "string" ? table.preferredHouseActor.trim() : ""
-    const actorId = preferredActorId && this.houseActors.has(preferredActorId)
-      ? preferredActorId
-      : actorIds[this._houseCursor % actorIds.length] as string
-    const actor = this.houseActors.get(actorId)
-    const profile = String(actor?.profileName || actorId || "tag")
-    if (!(preferredActorId && actorId === preferredActorId)) {
-      this._houseCursor += 1
-    }
-
-    const actorSlug = actorId.replace(/[^a-z0-9-]/gi, "-").toLowerCase()
-    const botId = `house_${actorSlug}_${this.container.utils.uuid().replace(/-/g, "").slice(0, 8)}`
-    const name = String(actor?.displayName || `House ${actorId}`)
-
-    // Deduct buy-in from house bankroll
-    const bankroll = this.ensureHouseBankroll()
-    if (bankroll.balance < table.startingStack) {
-      return false
-    }
-
-    this.bots.set(botId, {
-      botId,
-      name,
-      serverId: this.serverId,
-      metadata: { houseBot: true, profile, actorId },
-      createdAt: nowTs(),
-    })
-
-    try {
-      this.tableManager.joinTable({
-        tableId: table.id,
-        botId,
-        name,
-        stack: table.startingStack,
-        isHouseBot: true,
-        profile: actorId,
-      })
-      this.ensureTimeBank(runtime, botId)
-
-      void this.applyWalletEntry(HOUSE_BANKROLL_ID, "house_buy_in", -table.startingStack, {
-        tableId: table.id,
-        botId,
-        profile,
-        actorId,
-      })
-
-      return true
-    } catch {
-      this.bots.delete(botId)
-      return false
-    }
   }
 
   private setupHttpEndpoints() {
@@ -1461,12 +1128,11 @@ export class PokerServerRuntime {
 
     app.get("/health/ready", (_req: any, res: any) => {
       const snapshot = this.houseStatusSnapshot()
-      const ready = snapshot.status === "up" && snapshot.actorRegistry.actorIds.length > 0
+      const ready = snapshot.status === "up"
       res.status(ready ? 200 : 503).json({
         ok: ready,
         ready,
         serverId: this.serverId,
-        actorRegistry: snapshot.actorRegistry,
         at: new Date().toISOString(),
       })
     })
@@ -1787,23 +1453,6 @@ export class PokerServerRuntime {
       })
     })
 
-    app.get("/api/v1/house/bankroll", (_req: any, res: any) => {
-      const bankroll = this.ensureHouseBankroll()
-      const buyIns = bankroll.ledger.filter((e) => e.type === "house_buy_in")
-      const cashouts = bankroll.ledger.filter((e) => e.type === "house_cashout")
-      const totalInvested = buyIns.reduce((sum, e) => sum + Math.abs(e.amount), 0)
-      const totalReturned = cashouts.reduce((sum, e) => sum + e.amount, 0)
-      res.json({
-        balance: bankroll.balance,
-        initialBalance: HOUSE_BANKROLL_INITIAL,
-        pnl: bankroll.balance - HOUSE_BANKROLL_INITIAL,
-        totalInvested,
-        totalReturned,
-        activeBots: buyIns.length - cashouts.length,
-        ledgerCount: bankroll.ledger.length,
-      })
-    })
-
     app.get("/api/v1/house/status", (_req: any, res: any) => {
       res.json(this.houseStatusSnapshot())
     })
@@ -1946,7 +1595,6 @@ export class PokerServerRuntime {
         seat: player.seat,
         stack: player.stack,
         connected: true,
-        isHouseBot: false,
         inHand: player.inHand && !player.folded,
         folded: player.folded,
         allIn: player.allIn,
@@ -1990,14 +1638,6 @@ export class PokerServerRuntime {
       `Winners: ${winners}`,
       `Actions:\n${actions}`,
     ].join("\n")
-  }
-
-  private isHouseBot(botId: string): boolean {
-    if (botId.startsWith("house_")) {
-      return true
-    }
-    const bot = this.bots.get(botId)
-    return isRecord(bot?.metadata) && bot?.metadata?.houseBot === true
   }
 
   private botDisplayName(botId: string): string {
@@ -2057,7 +1697,7 @@ export class PokerServerRuntime {
 
       const buyIn = asNumber(tournamentId.replace("sng-", ""), table.startingStack)
       const runtime = this.runtimes.get(table.id)
-      const registered = table.players.filter((player) => !player.isHouseBot).length
+      const registered = table.players.length
       const status: "registration" | "starting" | "running" = runtime?.handActive
         ? "running"
         : (registered >= 2 ? "starting" : "registration")
@@ -2152,10 +1792,6 @@ export class PokerServerRuntime {
     }>()
 
     const ensure = (botId: string) => {
-      if (this.isHouseBot(botId)) {
-        return null
-      }
-
       const existing = stats.get(botId)
       if (existing) {
         return existing
@@ -2192,13 +1828,13 @@ export class PokerServerRuntime {
       const participants = new Set(
         hand.players
           .map((player) => String(player.id || ""))
-          .filter((botId) => botId.length > 0 && !this.isHouseBot(botId)),
+          .filter((botId) => botId.length > 0),
       )
 
       const contributions = new Map<string, number>()
       for (const action of hand.actions) {
         const botId = String(action.playerId || "")
-        if (!botId || this.isHouseBot(botId)) {
+        if (!botId) {
           continue
         }
         const amount = Number(action.amount || 0)
@@ -2211,7 +1847,7 @@ export class PokerServerRuntime {
       const payouts = new Map<string, number>()
       for (const winner of hand.winners) {
         const botId = String(winner.playerId || "")
-        if (!botId || this.isHouseBot(botId)) {
+        if (!botId) {
           continue
         }
         const amount = Number(winner.amount || 0)
@@ -2241,7 +1877,7 @@ export class PokerServerRuntime {
           botId: String(botId || ""),
           amount: Number(amount || 0),
         }))
-        .filter((winner) => winner.botId.length > 0 && !this.isHouseBot(winner.botId))
+        .filter((winner) => winner.botId.length > 0)
 
       if (winners.length <= 0) {
         continue
@@ -2376,10 +2012,6 @@ export class PokerServerRuntime {
       board: string[]
     }>
   } | null> {
-    if (this.isHouseBot(botId)) {
-      return null
-    }
-
     const leaderboard = await this.computeLeaderboard({ limit: 500 })
     const row = leaderboard.find((entry) => entry.botId === botId)
     if (!row) {
@@ -2645,18 +2277,17 @@ export class PokerServerRuntime {
       await this.handleJoinTable(socket, { tableId: tournament.tableId }, active)
 
       const table = this.tableManager.table(tournament.tableId) as PokerTable | undefined
-      const seat = table?.players.find((entry) => entry.botId === active.botId)?.seat
+      const seat = table?.players.find((entry) => entry.playerId === active.botId)?.seat
 
       this.send(socket, "tournament_start", {
         tournamentId,
         tableId: tournament.tableId,
         seat,
         players: (table?.players || []).map((player) => ({
-          botId: player.botId,
+          botId: player.playerId,
           name: player.name,
           seat: player.seat,
           stack: player.stack,
-          isHouseBot: player.isHouseBot,
         })),
         blindSchedule: this.defaultBlindSchedule(),
         status: table?.status || "registration",
@@ -2687,7 +2318,6 @@ export class PokerServerRuntime {
         startingStack: asNumber(incoming.payload.startingStack, 100),
         maxPlayers: Math.max(2, Math.min(9, Math.floor(asNumber(incoming.payload.maxPlayers, 9)))),
         actionTimeout: Math.max(1, Math.floor(asNumber(incoming.payload.actionTimeout, this.defaultActionTimeout))),
-        preferredHouseActor: incoming.payload.preferredHouseActor ? String(incoming.payload.preferredHouseActor) : undefined,
       }) as PokerTable
 
       this.send(socket, "table_created", this.serializeTable(table))
@@ -2735,7 +2365,7 @@ export class PokerServerRuntime {
         return
       }
 
-      const player = table.players.find((entry) => entry.botId === active.botId)
+      const player = table.players.find((entry) => entry.playerId === active.botId)
       if (!player) {
         this.sendError(socket, "not_seated", "You are not seated at this table")
         return
@@ -2777,7 +2407,7 @@ export class PokerServerRuntime {
       return
     }
 
-    const table = this.tableManager.tableForBot(botId) as PokerTable | undefined
+    const table = this.tableManager.tableForPlayer(botId) as PokerTable | undefined
 
     this.sessions.set(socket, {
       connectedAt: nowTs(),
@@ -2808,13 +2438,12 @@ export class PokerServerRuntime {
     if (table) {
       this.send(socket, "table_joined", {
         tableId: table.id,
-        seat: table.players.find((entry) => entry.botId === botId)?.seat,
+        seat: table.players.find((entry) => entry.playerId === botId)?.seat,
         players: table.players.map((player) => ({
-          botId: player.botId,
+          botId: player.playerId,
           name: player.name,
           seat: player.seat,
           stack: player.stack,
-          isHouseBot: player.isHouseBot,
           connected: player.connected,
         })),
       })
@@ -2848,7 +2477,7 @@ export class PokerServerRuntime {
       return
     }
 
-    const existingInTarget = target.players.some((player) => player.botId === session.botId)
+    const existingInTarget = target.players.some((player) => player.playerId === session.botId)
     if (!existingInTarget) {
       const wallet = this.ensureWallet(session.botId)
       if (wallet.balance < target.startingStack) {
@@ -2861,7 +2490,7 @@ export class PokerServerRuntime {
     try {
       joined = this.tableManager.joinTable({
         tableId: target.id,
-        botId: session.botId,
+        playerId: session.botId,
         name: this.bots.get(session.botId)?.name || session.botId,
         seatPreference: Number.isFinite(Number(payload.seatPreference))
           ? Number(payload.seatPreference)
@@ -2891,11 +2520,10 @@ export class PokerServerRuntime {
       tableId: target.id,
       seat: joined.player.seat,
       players: target.players.map((player: any) => ({
-        botId: player.botId,
+        botId: player.playerId,
         name: player.name,
         seat: player.seat,
         stack: player.stack,
-        isHouseBot: player.isHouseBot,
         connected: player.connected,
       })),
     })
@@ -2913,7 +2541,6 @@ export class PokerServerRuntime {
 
     this.sendTimeBankState(target.id, runtime, session.botId, "table_joined")
 
-    await this.maybeSeedHouseBots(target.id)
     this.broadcastTables()
     this.broadcastSpectatorState(target.id, "table_joined")
     await this.startHandIfReady(target.id, "join")
@@ -3045,7 +2672,7 @@ export class PokerServerRuntime {
       return
     }
 
-    const player = table.players.find((entry) => entry.botId === botId)
+    const player = table.players.find((entry) => entry.playerId === botId)
     if (!player || player.connected) {
       return
     }
@@ -3064,69 +2691,6 @@ export class PokerServerRuntime {
 
     await this.forceLeaveBotFromTable(botId, tableId, "reconnect-timeout")
     this.broadcastTables()
-  }
-
-  private async maybeSeedHouseBots(tableId: string) {
-    if (!asBoolean(this.options.seedLobby, true)) {
-      return
-    }
-
-    const table = this.tableManager.table(tableId) as PokerTable | undefined
-    if (!table) {
-      return
-    }
-
-    if (isShowcaseTable(table)) {
-      const runtime = this.ensureRuntime(table)
-      const targetSeats = Math.max(2, Math.min(6, table.maxPlayers))
-      const missing = Math.max(0, targetSeats - table.players.length)
-      for (let i = 0; i < missing; i += 1) {
-        if (!this.addHouseBotToTable(table, runtime)) {
-          break
-        }
-      }
-      return
-    }
-
-    const runtime = this.ensureRuntime(table)
-
-    if (table.preferredHouseActor && table.maxPlayers === 2) {
-      const realPlayers = table.players.filter((entry) => !entry.isHouseBot)
-      if (realPlayers.length >= 1) {
-        const missing = Math.max(0, 2 - table.players.length)
-        for (let i = 0; i < missing; i += 1) {
-          if (!this.addHouseBotToTable(table, runtime)) {
-            break
-          }
-        }
-      }
-      return
-    }
-
-    if (!isSngTable(table)) {
-      return
-    }
-
-    const realPlayers = table.players.filter((entry) => !entry.isHouseBot)
-    const housePlayers = table.players.filter((entry) => entry.isHouseBot)
-
-    if (realPlayers.length >= 2 && !runtime.handActive) {
-      for (const house of housePlayers) {
-        await this.forceLeaveBotFromTable(house.botId, table.id, "house-prune")
-      }
-      return
-    }
-
-    if (realPlayers.length < 1) {
-      return
-    }
-
-    const needed = Math.max(0, 2 - table.players.length)
-    for (let i = 0; i < needed; i += 1) {
-      if (!this.addHouseBotToTable(table, runtime)) {
-        break
-      }
-    }
   }
 
   private ensureTimeBank(runtime: TableRuntime, botId: string): number {
@@ -3198,12 +2762,12 @@ export class PokerServerRuntime {
         continue
       }
 
-      const previous = this.timeBankRemaining(runtime, player.botId)
+      const previous = this.timeBankRemaining(runtime, player.playerId)
       const next = Math.min(this.timeBankCapSeconds, previous + this.timeBankAccrualSeconds)
-      runtime.timeBanks.set(player.botId, next)
+      runtime.timeBanks.set(player.playerId, next)
 
       if (next !== previous) {
-        this.sendTimeBankState(tableId, runtime, player.botId, "hand_accrual", {
+        this.sendTimeBankState(tableId, runtime, player.playerId, "hand_accrual", {
           delta: next - previous,
           accruedSeconds: next - previous,
         })
@@ -3332,7 +2896,7 @@ export class PokerServerRuntime {
       return
     }
 
-    const actor = table.players.find((entry) => entry.botId === actorId)
+    const actor = table.players.find((entry) => entry.playerId === actorId)
     if (!actor) {
       if (this.shouldFinalize(game)) {
         await this.finalizeHand(tableId, "missing-actor")
@@ -3342,17 +2906,6 @@ export class PokerServerRuntime {
 
     this.startActionClock(table, runtime, actorId)
     this.sendTimeBankState(table.id, runtime, actorId, "turn_start")
-
-    if (actor.isHouseBot) {
-      const minDelay = this.botThinkDelayMinMs
-      const maxDelay = this.botThinkDelayMaxMs
-      const jitter = Math.max(0, maxDelay - minDelay)
-      const delay = minDelay + Math.floor(Math.random() * (jitter + 1))
-      setTimeout(() => {
-        void this.runHouseBotTurn(table.id, actorId)
-      }, delay)
-      return
-    }
 
     const socket = this.socketsByBot.get(actorId)
     if (!socket) {
@@ -3502,246 +3055,6 @@ export class PokerServerRuntime {
     }
   }
 
-  private get strategy(): Strategy {
-    return this.container.feature("strategy", { enable: true }) as Strategy
-  }
-
-  private gamePositionFor(game: GameState, playerId: string): PokerPosition {
-    const seats = sortedSeats(game.players)
-    const dealerSeat = game.dealer
-    const dealerIdx = seats.findIndex((p) => p.seat === dealerSeat)
-    const target = seats.find((p) => p.id === playerId)
-
-    if (!target || dealerIdx < 0) return "BTN"
-
-    const rotated = [...seats.slice(dealerIdx), ...seats.slice(0, dealerIdx)]
-    const count = rotated.length
-
-    if (count === 2) {
-      return rotated[0]?.id === playerId ? "BTN" : "BB"
-    }
-
-    const labels: PokerPosition[] = ["BTN", "SB", "BB"]
-    const remaining = count - labels.length
-    for (let i = 0; i < remaining; i++) {
-      if (i === 0) labels.push("UTG")
-      else if (i === remaining - 1) labels.push("CO")
-      else labels.push("MP")
-    }
-
-    const idx = rotated.findIndex((p) => p.id === playerId)
-    return labels[idx] || "MP"
-  }
-
-  private resolveHouseActorId(botId: string, playerProfile?: string): string {
-    if (playerProfile) {
-      return String(playerProfile)
-    }
-
-    const metadata = this.bots.get(botId)?.metadata
-    if (isRecord(metadata) && typeof metadata.actorId === "string") {
-      return metadata.actorId
-    }
-
-    return "tag"
-  }
-
-  private async runHouseBotTurn(tableId: string, botId: string): Promise<void> {
-    const table = this.tableManager.table(tableId) as PokerTable | undefined
-    const runtime = this.runtimes.get(tableId)
-
-    if (!table || !runtime || !runtime.handActive) {
-      return
-    }
-
-    const game = runtime.gameEngine.game as GameState
-    if (game.currentActor !== botId) {
-      return
-    }
-
-    const player = table.players.find((entry) => entry.botId === botId)
-    if (!player || !player.isHouseBot) {
-      return
-    }
-
-    const actorId = this.resolveHouseActorId(botId, player.profile)
-    const actorModule = this.houseActors.get(actorId)
-    const profile = String(actorModule?.profileName || actorId || "tag")
-    const gamePlayer = game.players.find((p) => p.id === botId)
-    if (!gamePlayer) return
-
-    const toCall = toCallForPlayer(game, botId)
-    const legalActions = this.legalActionsFor(game, botId)
-    const position = this.gamePositionFor(game, botId)
-    const heroCards = gamePlayer.holeCards.length === 2
-      ? gamePlayer.holeCards as [string, string]
-      : ["Ah", "As"] as [string, string]
-
-    const street = game.stage === "waiting" || game.stage === "complete" || game.stage === "showdown"
-      ? "preflop" as const
-      : game.stage
-
-    const inPosition = ["BTN", "CO"].includes(position)
-    const activePlayers = game.players.filter((p) => p.inHand && !p.folded)
-    const stage = street
-
-    try {
-      let action: string
-      let amount: number | undefined
-      let reasonSuffix = "profile"
-      let decisionReasoning: string | undefined
-
-      if (typeof actorModule?.decide === "function") {
-        const custom = await actorModule.decide({
-          actorId,
-          botId,
-          tableId,
-          stage,
-          position,
-          legalActions,
-          toCall,
-          potSize: game.pot,
-          stack: gamePlayer.stack,
-          currentBet: game.currentBet,
-          smallBlind: game.smallBlind,
-          bigBlind: game.bigBlind,
-          playersInHand: activePlayers.length,
-          board: [...game.board],
-          heroCards,
-          opponentBotIds: activePlayers
-            .map((entry) => String(entry.id))
-            .filter((entryId) => entryId !== botId),
-        })
-
-        if (isRecord(custom) && typeof custom.action === "string") {
-          action = custom.action
-          const rawAmount = Number(custom.amount)
-          amount = Number.isFinite(rawAmount) ? rawAmount : undefined
-          if (typeof custom.reasoning === "string" && custom.reasoning.trim().length > 0) {
-            decisionReasoning = custom.reasoning.trim()
-          } else if (typeof custom.reason === "string" && custom.reason.trim().length > 0) {
-            decisionReasoning = custom.reason.trim()
-          }
-          reasonSuffix = "actor"
-        } else {
-          const fallback = toCall > 0 ? "fold" : "check"
-          action = fallback
-          amount = undefined
-          reasonSuffix = "actor-invalid"
-        }
-      } else {
-        const decision = await this.strategy.decide(profile, {
-          heroCards,
-          board: game.board,
-          street,
-          position,
-          inPosition,
-          checkedTo: toCall <= 0,
-          potSize: game.pot,
-          toCall,
-          effectiveStack: gamePlayer.stack,
-          playersInHand: activePlayers.length,
-          playersLeftToAct: activePlayers.filter((p) => !p.allIn).length,
-          facingBet: toCall > 0,
-          facingRaise: toCall > 0 && game.currentBet > game.bigBlind,
-          facingThreeBet: false,
-        })
-
-        action = decision.action
-        amount = decision.amount
-      }
-
-      await this.applyAction(tableId, botId, action, amount, {
-        auto: true,
-        reason: `house-${actorId}-${reasonSuffix}`,
-        ...(decisionReasoning ? { decisionReasoning } : {}),
-      })
-    } catch {
-      // Fallback if strategy fails
-      const fallback = toCall > 0 ? "fold" : "check"
-      await this.applyAction(tableId, botId, fallback, undefined, {
-        auto: true,
-        reason: `house-${actorId}-fallback`,
-      })
-    }
-  }
-
-  private pickHouseBotAction(
-    profile: string,
-    game: GameState,
-    table: PokerTable,
-    botId: string,
-  ): { action: PlayerAction; amount?: number } {
-    const toCall = toCallForPlayer(game, botId)
-    const player = game.players.find((entry) => entry.id === botId)
-    const stack = player?.stack || table.startingStack
-    const legal = this.legalActionsFor(game, botId)
-
-    const can = (action: PlayerAction) => legal.includes(action)
-
-    const lastRaise = game.lastRaiseSize ?? table.bigBlind
-    const minRaise = toCall + lastRaise
-    const raiseAmount = Math.max(minRaise, Math.round(Math.max(table.bigBlind * 2, game.pot * 0.8)))
-    const betAmount = Math.max(table.bigBlind, Math.round(Math.max(table.bigBlind, game.pot * 0.55)))
-
-    const roll = Math.random()
-
-    if (toCall > 0) {
-      if (profile === "nit") {
-        if (roll < 0.72 && can("fold")) return { action: "fold" }
-        if (roll < 0.93 && can("call")) return { action: "call" }
-        if (can("raise")) return { action: "raise", amount: raiseAmount }
-      }
-
-      if (profile === "calling-station") {
-        if (roll < 0.80 && can("call")) return { action: "call" }
-        if (roll < 0.90 && can("fold")) return { action: "fold" }
-        if (can("raise")) return { action: "raise", amount: raiseAmount }
-      }
-
-      if (profile === "maniac") {
-        if (roll < 0.62 && can("raise")) return { action: "raise", amount: raiseAmount }
-        if (roll < 0.90 && can("call")) return { action: "call" }
-        if (can("all-in") && stack <= toCall * 2) return { action: "all-in" }
-        return { action: can("fold") ? "fold" : "call" }
-      }
-
-      if (profile === "lag") {
-        if (roll < 0.45 && can("raise")) return { action: "raise", amount: raiseAmount }
-        if (roll < 0.85 && can("call")) return { action: "call" }
-        return { action: can("fold") ? "fold" : "call" }
-      }
-
-      // tag
-      if (roll < 0.30 && can("raise")) return { action: "raise", amount: raiseAmount }
-      if (roll < 0.82 && can("call")) return { action: "call" }
-      return { action: can("fold") ? "fold" : "call" }
-    }
-
-    if (profile === "nit") {
-      if (roll < 0.22 && can("bet")) return { action: "bet", amount: betAmount }
-      return { action: can("check") ? "check" : "bet", amount: betAmount }
-    }
-
-    if (profile === "calling-station") {
-      if (roll < 0.18 && can("bet")) return { action: "bet", amount: Math.round(betAmount * 0.8) }
-      return { action: can("check") ? "check" : "bet", amount: betAmount }
-    }
-
-    if (profile === "maniac") {
-      if (roll < 0.82 && can("bet")) return { action: "bet", amount: Math.round(Math.max(betAmount, game.pot * 0.9)) }
-      return { action: can("check") ? "check" : "bet", amount: betAmount }
-    }
-
-    if (profile === "lag") {
-      if (roll < 0.58 && can("bet")) return { action: "bet", amount: betAmount }
-      return { action: can("check") ? "check" : "bet", amount: betAmount }
-    }
-
-    if (roll < 0.42 && can("bet")) return { action: "bet", amount: betAmount }
-    return { action: can("check") ? "check" : "bet", amount: betAmount }
-  }
-
   private async applyAction(
     tableId: string,
     botId: string,
@@ -3760,7 +3073,7 @@ export class PokerServerRuntime {
       return false
     }
 
-    const player = table.players.find((entry) => entry.botId === botId)
+    const player = table.players.find((entry) => entry.playerId === botId)
     if (!player) {
       return false
     }
@@ -3864,7 +3177,7 @@ export class PokerServerRuntime {
     }
 
     for (const player of eligible) {
-      this.ensureTimeBank(runtime, player.botId)
+      this.ensureTimeBank(runtime, player.playerId)
     }
 
     runtime.handNumber += 1
@@ -3883,7 +3196,7 @@ export class PokerServerRuntime {
     base.players = eligible
       .sort((a, b) => a.seat - b.seat)
       .map((entry) => ({
-        id: entry.botId,
+        id: entry.playerId,
         seat: entry.seat,
         stack: entry.stack,
         holeCards: [],
@@ -3925,16 +3238,12 @@ export class PokerServerRuntime {
 
     const game = runtime.gameEngine.game as GameState
     for (const player of table.players) {
-      if (player.isHouseBot) {
-        continue
-      }
-
-      const socket = this.socketsByBot.get(player.botId)
+      const socket = this.socketsByBot.get(player.playerId)
       if (!socket) {
         continue
       }
 
-      const gamePlayer = game.players.find((entry) => entry.id === player.botId)
+      const gamePlayer = game.players.find((entry) => entry.id === player.playerId)
       if (!gamePlayer || gamePlayer.holeCards.length !== 2) {
         continue
       }
@@ -3966,16 +3275,12 @@ export class PokerServerRuntime {
     const activeCount = playersInHand(game).length
 
     for (const player of table.players) {
-      if (player.isHouseBot) {
-        continue
-      }
-
-      const socket = this.socketsByBot.get(player.botId)
+      const socket = this.socketsByBot.get(player.playerId)
       if (!socket) {
         continue
       }
 
-      const gamePlayer = game.players.find((entry) => entry.id === player.botId)
+      const gamePlayer = game.players.find((entry) => entry.id === player.playerId)
       if (!gamePlayer) {
         continue
       }
@@ -3986,19 +3291,18 @@ export class PokerServerRuntime {
         stage: game.stage,
         board: game.board,
         pot: game.pot,
-        toCall: toCallForPlayer(game, player.botId),
+        toCall: toCallForPlayer(game, player.playerId),
         stack: gamePlayer.stack,
         position: tablePositionName(player.seat, table),
         playersInHand: activeCount,
-        availableActions: this.legalActionsFor(game, player.botId),
+        availableActions: this.legalActionsFor(game, player.playerId),
         players: table.players.map((p) => {
-          const gp = game.players.find((entry) => entry.id === p.botId)
+          const gp = game.players.find((entry) => entry.id === p.playerId)
           return {
-            botId: p.botId,
+            botId: p.playerId,
             name: p.name,
             seat: p.seat,
             stack: gp?.stack ?? p.stack,
-            isHouseBot: p.isHouseBot,
             connected: p.connected,
           }
         }),
@@ -4018,7 +3322,7 @@ export class PokerServerRuntime {
     }
 
     const game = runtime.gameEngine.game as GameState
-    const player = table.players.find((entry) => entry.botId === botId)
+    const player = table.players.find((entry) => entry.playerId === botId)
     const gamePlayer = game.players.find((entry) => entry.id === botId)
 
     if (!player) {
@@ -4110,7 +3414,6 @@ export class PokerServerRuntime {
         seat: entry.seat,
         stack: entry.stack,
         cards: entry.holeCards,
-        isHouseBot: table.players.find((player) => player.botId === entry.id)?.isHouseBot,
       })),
       actions: game.actionHistory.map((entry) => ({
         seq: entry.seq,
@@ -4195,24 +3498,6 @@ export class PokerServerRuntime {
       runtime.pendingKick.delete(botId)
     }
 
-    // Auto-rebuy busted players on preferredHouseActor tables so play continues
-    const tableForRebuy = this.tableManager.table(tableId) as PokerTable | undefined
-    if (tableForRebuy?.preferredHouseActor) {
-      for (const player of tableForRebuy.players) {
-        if (player.stack > 0) continue
-        this.tableManager.setPlayerStack(tableId, player.botId, tableForRebuy.startingStack)
-        const walletId = player.isHouseBot ? HOUSE_BANKROLL_ID : player.botId
-        const entryType = player.isHouseBot ? "house_buy_in" as const : "cash_buy_in" as const
-        await this.applyWalletEntry(walletId, entryType, -tableForRebuy.startingStack, {
-          tableId,
-          botId: player.botId,
-          reason: "auto-rebuy",
-        })
-      }
-    }
-
-    await this.maybeSeedHouseBots(tableId)
-
     const refreshed = this.tableManager.table(tableId) as PokerTable | undefined
     if (refreshed) {
       this.accrueTimeBanks(tableId, runtime, refreshed)
@@ -4239,7 +3524,7 @@ export class PokerServerRuntime {
       return
     }
 
-    const leaving = table.players.find((entry) => entry.botId === botId)
+    const leaving = table.players.find((entry) => entry.playerId === botId)
     if (!leaving) {
       return
     }
@@ -4258,27 +3543,17 @@ export class PokerServerRuntime {
     }
 
     const playerStack = result.player?.stack ?? 0
-    if (leaving.isHouseBot) {
-      if (playerStack > 0) {
-        await this.applyWalletEntry(HOUSE_BANKROLL_ID, "house_cashout", playerStack, {
-          tableId,
-          botId,
-          reason,
-        })
-      }
-    } else {
-      if (playerStack > 0) {
-        await this.applyWalletEntry(botId, "cash_cashout", playerStack, {
-          tableId,
-          reason,
-        })
-      }
+    if (playerStack > 0) {
+      await this.applyWalletEntry(botId, "cash_cashout", playerStack, {
+        tableId,
+        reason,
+      })
+    }
 
-      const socket = this.socketsByBot.get(botId)
-      if (socket) {
-        const wallet = this.ensureWallet(botId)
-        this.send(socket, "wallet_state", this.walletSnapshot(wallet))
-      }
+    const socket = this.socketsByBot.get(botId)
+    if (socket) {
+      const wallet = this.ensureWallet(botId)
+      this.send(socket, "wallet_state", this.walletSnapshot(wallet))
     }
 
     const runtime = this.runtimes.get(tableId)
@@ -4365,15 +3640,14 @@ export class PokerServerRuntime {
       .slice()
       .sort((left, right) => left.seat - right.seat)
       .map((player) => {
-        const gamePlayer = game.players.find((entry) => entry.id === player.botId)
-        const revealPlayer = revealByPlayerId.get(player.botId)
+        const gamePlayer = game.players.find((entry) => entry.id === player.playerId)
+        const revealPlayer = revealByPlayerId.get(player.playerId)
         return {
-          botId: player.botId,
+          botId: player.playerId,
           name: player.name,
           seat: player.seat,
           stack: player.stack,
           connected: player.connected,
-          isHouseBot: player.isHouseBot,
           inHand: revealActive
             ? Boolean(revealPlayer?.inHand && !revealPlayer?.folded)
             : (gamePlayer ? (gamePlayer.inHand && !gamePlayer.folded) : false),
@@ -4469,11 +3743,7 @@ export class PokerServerRuntime {
     }
 
     for (const player of table.players) {
-      if (player.isHouseBot) {
-        continue
-      }
-
-      const socket = this.socketsByBot.get(player.botId)
+      const socket = this.socketsByBot.get(player.playerId)
       if (socket) {
         this.send(socket, type, payload)
       }
@@ -4492,13 +3762,11 @@ export class PokerServerRuntime {
       actionTimeout: table.actionTimeout,
       status: table.status,
       players: table.players.map((player) => ({
-        botId: player.botId,
+        botId: player.playerId,
         name: player.name,
         seat: player.seat,
         stack: player.stack,
-        isHouseBot: player.isHouseBot,
         connected: player.connected,
-        ...(player.profile ? { profile: player.profile } : {}),
       })),
     }
   }
@@ -4517,30 +3785,6 @@ export class PokerServerRuntime {
       ledger: [],
     }
     this.wallets.set(botId, wallet)
-    return wallet
-  }
-
-  private ensureHouseBankroll(): WalletState {
-    const existing = this.wallets.get(HOUSE_BANKROLL_ID)
-    if (existing) {
-      return existing
-    }
-
-    const wallet: WalletState = {
-      botId: HOUSE_BANKROLL_ID,
-      balance: HOUSE_BANKROLL_INITIAL,
-      currency: "PLAY",
-      updatedAt: nowTs(),
-      ledger: [{
-        id: "house-init",
-        botId: HOUSE_BANKROLL_ID,
-        type: "register_credit" as WalletLedgerType,
-        amount: HOUSE_BANKROLL_INITIAL,
-        balanceAfter: HOUSE_BANKROLL_INITIAL,
-        timestamp: nowTs(),
-      }],
-    }
-    this.wallets.set(HOUSE_BANKROLL_ID, wallet)
     return wallet
   }
 

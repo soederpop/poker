@@ -20,9 +20,7 @@ export interface TablePlayerSummary {
   name: string
   seat: number
   stack: number
-  isHouseBot?: boolean
   connected?: boolean
-  profile?: string
 }
 
 export interface TableSummary {
@@ -157,7 +155,6 @@ export interface SpectatorPlayerSnapshot {
   seat: number
   stack: number
   connected?: boolean
-  isHouseBot?: boolean
   inHand: boolean
   folded: boolean
   allIn: boolean

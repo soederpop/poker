@@ -224,8 +224,6 @@ async function startRuntime(options: {
   timeBankAccrualSeconds?: number
   showdownRevealMs?: number
   nonShowdownRevealMs?: number
-  botThinkDelayMinMs?: number
-  botThinkDelayMaxMs?: number
 } = {}): Promise<RuntimeHarness> {
   const container = new AGIContainer({ cwd: PROJECT_CWD })
   await bootPokerContainer(container as any, { logBackend: false })
@@ -250,8 +248,6 @@ async function startRuntime(options: {
     timeBankAccrualSeconds: options.timeBankAccrualSeconds ?? 1,
     showdownRevealMs: options.showdownRevealMs ?? 4000,
     nonShowdownRevealMs: options.nonShowdownRevealMs ?? 1200,
-    botThinkDelayMinMs: options.botThinkDelayMinMs ?? 1200,
-    botThinkDelayMaxMs: options.botThinkDelayMaxMs ?? 2600,
   })
 
   await runtime.start()
@@ -590,7 +586,7 @@ describe("poker runtime integration", () => {
     expect(Number(afterPayload.entries[0]?.totalHands || 0)).toBe(0)
   }, 45_000)
 
-  it("reports house liveness, readiness, and actor registry status", async () => {
+  it("reports server liveness and readiness", async () => {
     const harness = await startRuntime({ seedLobby: true })
     runtimeCleanup.push(() => harness.runtime.stop().then(() => undefined))
 
@@ -603,15 +599,11 @@ describe("poker runtime integration", () => {
     expect(readyResponse.ok).toBeTrue()
     const readyPayload = await readyResponse.json()
     expect(readyPayload.ready).toBeTrue()
-    expect(Array.isArray(readyPayload.actorRegistry?.actorIds)).toBeTrue()
-    expect(readyPayload.actorRegistry.actorIds.includes("nit")).toBeTrue()
 
     const statusResponse = await fetch(`${harness.httpUrl}/api/v1/house/status`)
     expect(statusResponse.ok).toBeTrue()
     const statusPayload = await statusResponse.json()
     expect(String(statusPayload.status || "")).toBe("up")
-    expect(Number(statusPayload.actorRegistry?.loaded || 0)).toBeGreaterThan(0)
-    expect(Number(statusPayload.houseBots?.seated || 0)).toBeGreaterThanOrEqual(2)
   }, 45_000)
 
   it("uses Luca frontend routes as canonical web surface", async () => {
@@ -659,61 +651,6 @@ describe("poker runtime integration", () => {
     expect(String(start.payload?.tableId || "")).toBe(String(sng.tableId || ""))
   }, 45_000)
 
-  it("seeds an active showcase table for spectators when lobby seeding is enabled", async () => {
-    const harness = await startRuntime({ seedLobby: true })
-    runtimeCleanup.push(() => harness.runtime.stop().then(() => undefined))
-
-    const response = await fetch(`${harness.httpUrl}/api/v1/tables`)
-    expect(response.ok).toBeTrue()
-    const payload = await response.json()
-    const tables = Array.isArray(payload.tables) ? payload.tables as Array<any> : []
-
-    const showcase = tables.find((entry) => String(entry.name || "").toLowerCase().startsWith("showcase bots"))
-    expect(Boolean(showcase)).toBeTrue()
-    expect(String(showcase.status || "")).toBe("active")
-
-    const players = Array.isArray(showcase.players) ? showcase.players as Array<any> : []
-    expect(players.length).toBeGreaterThanOrEqual(2)
-    expect(players.every((player) => player?.isHouseBot === true)).toBeTrue()
-    expect(showcase.handActive).toBeTrue()
-  }, 45_000)
-
-  it("auto-finalizes all-in runouts so showcase hands do not stall", async () => {
-    const harness = await startRuntime({ spectator: true, seedLobby: true })
-    runtimeCleanup.push(() => harness.runtime.stop().then(() => undefined))
-
-    const tablesResponse = await fetch(`${harness.httpUrl}/api/v1/tables`)
-    expect(tablesResponse.ok).toBeTrue()
-    const tablesPayload = await tablesResponse.json()
-    const tables = Array.isArray(tablesPayload.tables) ? tablesPayload.tables as Array<any> : []
-    const showcase = tables.find((entry) => String(entry?.name || "").toLowerCase().startsWith("showcase bots"))
-    expect(Boolean(showcase)).toBeTrue()
-
-    const tableId = String(showcase?.id || "")
-    expect(tableId.length > 0).toBeTrue()
-
-    const spectatorUrl = String(harness.spectatorWsUrl || "")
-    expect(spectatorUrl.length > 0).toBeTrue()
-
-    const spectator = await connectSpectator(spectatorUrl)
-    runtimeCleanup.push(() => spectator.close())
-
-    await spectator.inbox.waitFor("spectator_ready", () => true, 10_000)
-    spectator.ws.send(JSON.stringify({
-      type: "spectate",
-      payload: { tableId },
-    }))
-
-    await spectator.inbox.waitFor("spectator_joined", (message) => String(message.payload?.tableId || "") === tableId, 10_000)
-    const handResult = await spectator.inbox.waitFor("hand_result", (message) => String(message.payload?.tableId || "") === tableId, 35_000)
-    expect(Number(handResult.payload?.pot || 0)).toBeGreaterThan(0)
-    expect(Number(handResult.payload?.handNumber || 0)).toBeGreaterThanOrEqual(1)
-
-    const handsResponse = await fetch(`${harness.httpUrl}/api/v1/hands?tableId=${encodeURIComponent(tableId)}&limit=5`)
-    expect(handsResponse.ok).toBeTrue()
-    const handsPayload = await handsResponse.json()
-    expect(Number(handsPayload.total || 0)).toBeGreaterThan(0)
-  }, 50_000)
 
   it("keeps showdown visible for at least four seconds before next hand starts", async () => {
     const harness = await startRuntime({
@@ -789,30 +726,45 @@ describe("poker runtime integration", () => {
     expect(progress.elapsedMs).toBeLessThan(3500)
   }, 45_000)
 
-  it("showcase runtime progresses through consecutive hands with payout invariants", async () => {
+  it("client bot runtime progresses through consecutive hands with payout invariants", async () => {
     const harness = await startRuntime({
       spectator: true,
-      seedLobby: true,
       actionTimeout: 1,
       timeBankStartSeconds: 1,
       timeBankCapSeconds: 1,
       timeBankAccrualSeconds: 0,
       showdownRevealMs: 4000,
       nonShowdownRevealMs: 1200,
-      botThinkDelayMinMs: 10,
-      botThinkDelayMaxMs: 40,
     })
     runtimeCleanup.push(() => harness.runtime.stop().then(() => undefined))
 
-    const tablesResponse = await fetch(`${harness.httpUrl}/api/v1/tables`)
-    expect(tablesResponse.ok).toBeTrue()
-    const tablesPayload = await tablesResponse.json()
-    const tables = Array.isArray(tablesPayload.tables) ? tablesPayload.tables as Array<any> : []
-    const showcase = tables.find((entry) => String(entry?.name || "").toLowerCase().startsWith("showcase bots"))
-    expect(Boolean(showcase)).toBeTrue()
+    // Register 4 client bots and connect them to a shared table
+    const botReg1 = await registerBot(harness.httpUrl, "payout-bot-1")
+    const botReg2 = await registerBot(harness.httpUrl, "payout-bot-2")
+    const botReg3 = await registerBot(harness.httpUrl, "payout-bot-3")
+    const botReg4 = await registerBot(harness.httpUrl, "payout-bot-4")
 
-    const tableId = String(showcase?.id || "")
+    const p1 = await connectPlayer(harness.wsUrl, botReg1.token)
+    const p2 = await connectPlayer(harness.wsUrl, botReg2.token)
+    const p3 = await connectPlayer(harness.wsUrl, botReg3.token)
+    const p4 = await connectPlayer(harness.wsUrl, botReg4.token)
+    runtimeCleanup.push(() => p1.close())
+    runtimeCleanup.push(() => p2.close())
+    runtimeCleanup.push(() => p3.close())
+    runtimeCleanup.push(() => p4.close())
+
+    const stopAuto1 = installAutoPlayer(p1)
+    const stopAuto2 = installAutoPlayer(p2)
+    const stopAuto3 = installAutoPlayer(p3)
+    const stopAuto4 = installAutoPlayer(p4)
+    runtimeCleanup.push(async () => { stopAuto1(); stopAuto2(); stopAuto3(); stopAuto4() })
+
+    // Create a table and seat all 4 bots
+    const tableId = await createTable(p1, "Payout Invariant Table", { maxPlayers: 4 })
     expect(tableId.length > 0).toBeTrue()
+    await joinTable(p2, tableId)
+    await joinTable(p3, tableId)
+    await joinTable(p4, tableId)
 
     const spectatorUrl = String(harness.spectatorWsUrl || "")
     expect(spectatorUrl.length > 0).toBeTrue()
@@ -821,10 +773,7 @@ describe("poker runtime integration", () => {
     runtimeCleanup.push(() => spectator.close())
 
     await spectator.inbox.waitFor("spectator_ready", () => true, 10_000)
-    spectator.ws.send(JSON.stringify({
-      type: "spectate",
-      payload: { tableId },
-    }))
+    spectator.ws.send(JSON.stringify({ type: "spectate", payload: { tableId } }))
     await spectator.inbox.waitFor("spectator_joined", (message) => String(message.payload?.tableId || "") === tableId, 10_000)
 
     const completedHands: number[] = []
@@ -833,9 +782,7 @@ describe("poker runtime integration", () => {
       const handResult = await spectator.inbox.waitFor(
         "hand_result",
         (message) => {
-          if (String(message.payload?.tableId || "") !== tableId) {
-            return false
-          }
+          if (String(message.payload?.tableId || "") !== tableId) return false
           return Number(message.payload?.handNumber || 0) >= minHandNumber
         },
         45_000,
